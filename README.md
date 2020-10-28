@@ -24,7 +24,8 @@ How it works
 **Preparing your own inputs**\
 Preparing your inputs as fasta or fastq reads containing sequence tags is the most time consuming step and requires careful work.  Essentially this step is outlining where each read should be assembled by hand for the pipeline to perform later. A GUI program for working with DNA sequence is necessary for the following steps to be practical.  Geneious Prime works very well for this, but free alternatives like Genome Compiler, Unipro UGENE, or Benchling's sequence tools would likely be sufficient.
 
-1\) The first step for creating an assembly is to find reads from the region.  To do this, define sequence features (or patterns of features) that are unique to the region.  For example, one set of tandem repeats of the 45S ribosome genes in *Arabidopsis thaliana* are bordered on one end by the At4g00005 protein coding gene.  Reads containing this junction are clearly unique to this region, as this gene is unique.  Reads containing this feature can be retrieved by BLAST or minimap2 alignment to the unique sequence.
+1\) The first step for creating an assembly is to find reads from the region.  To do this, define sequence features (or patterns of features) that are unique to the region.  Reads containing such a feature can be retrieved by BLAST or minimap2 alignment to the unique sequence.
+>For example, one set of tandem repeats of the 45S ribosome genes in *Arabidopsis thaliana* are bordered on one end by the At4g00005 protein coding gene.  Reads containing this junction are clearly unique to this region, as this gene is unique.  
 
 Less obvious unique features might include unique structural variants within repeats.  Alignments to a consensus repeat, dot plots against a consensus repeat, and/or automated feature annotations can be useful for identifying such variants.  For example, in a set of *A. thaliana* 45S repeats, annotating repeat reads revealed a region where two tandem repeat units were both truncated in the same manner.  While this type of truncation was seen to occur in several places, it appeared (from examining nearby features) that this tandem truncation occured in only one location in the genome.
 
@@ -34,7 +35,7 @@ Less obvious unique features might include unique structural variants within rep
 
 >Using the example of the 45S gene/At4g0005 gene above, tags were placed at the start of repeats.  This was done at every fourth repeat unit after the unique junction.  Tag A was placed at the 4th repeat, tag B at the 8th repeat, and tag C at the 12th repeat, etc.
 
-Each tag should be inserted in the position of any read that represents a specific genomic coordinate.  The tags must also be placed in order from left to right according to the expected contig.  
+The order of the tags from left to right in the expected contig needs to match the order of the tags in the tag fasta file.  Any time that a read contains a region that you have decided to tag, a tag **must** be placed there for the assembly to occur properly.
 
 4\) Using Geneious to perform the actual edits to the reads can be performed thus (I believe that Genome Compiler has very similar features):
 - A) Open all of the reads in Geneious together (as a Geneious sequence list)
