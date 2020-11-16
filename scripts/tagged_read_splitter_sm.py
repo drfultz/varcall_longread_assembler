@@ -61,7 +61,7 @@ for tagA,tagB in zip(tags[:-1:],tags[1::]):
 		path = "segment_reads/" + snakemake.wildcards["sample"]
 		os.makedirs(path, exist_ok=True)
 		#write the matched fasta entries for this tag
-		out_fa_file = path + "/seg_" + str(count) + "to" + str(count+1) + "_reads.fa"
+		out_fa_file = f"{path}/seg_{str(count).zfill(2)}to{str(count+1).zfill(2)}_reads.fa"
 		with open(out_fa_file, "w") as out_fa:
 			out_fa.write(content)
 
