@@ -15,7 +15,7 @@ import os
 ###is saved into a fasta (one fasta per pattern).  No file is written if no match is found.
 
 ###This program is intended to find unique 'tags' artificially placed into noisy long reads
-###at the same known positions within each read. The intent is to generate inputs for MSA bounded by
+###at the same known positions within each read. The intent is to generate MSA inputs bounded by
 ###these tags, which in turn will generate consensus sequences for segements of difficult to assemble
 ###regions of the genome
 
@@ -56,7 +56,6 @@ for tagA,tagB in zip(tags[:-1:],tags[1::]):
 
 	#if any matches are found for the pattern
 	if content:
-		#out_fa_file = "seg_" + str(count+1) + "to" + str(count) + ".fa"
 		#make a directory using snakemake wildcard
 		path = "segment_reads/" + snakemake.wildcards["sample"]
 		os.makedirs(path, exist_ok=True)

@@ -2,6 +2,20 @@ localrules: tagged_read_splitter, cons_calls, merge_cons
 
 configfile: "config.yaml"
 
+rule fq_to_fa:
+    input:
+        "tagged_reads/{sample}_tagreads.fq"
+    output:
+        "tagged_reads/{sample}_tagreads.fa"
+    params:
+        ppn="1",
+        vmem="8gb",
+        walltime="1:00:00"
+    conda:
+        "envs/bbmap2.yaml"
+    shell:
+        "reformat.sh qin=33 in={input[0]} out={output[0]}"
+
 #python script searches reads for sequence in between 'sequence tags',
 #then bins the sub-sequences into the appropriate multi-fasta for that tag set
 checkpoint tagged_read_splitter:
