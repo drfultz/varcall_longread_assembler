@@ -5,14 +5,15 @@ import subprocess
 import re
 import os
 
-###First, pair the 'sequence tags' together as search patterns.
-###Takes a first fastx and creates a search pattern from each successive pair of sequences.
-###The pattern matches any sequence between an exact match of the each member of the pair.
+#####First, pair the 'sequence tags' together as search patterns.
+###Takes a 'tag' fastx and creates a search pattern from each successive pair of sequences.
+###The pattern matches any sequence between an exact match of the first sequence and
+###an exact match of the second sequence
 
-###Then, look for that pattern 
-###Then, a second fastx is iterated one time for each search pattern.
-###The first occurence of the pattern per read (inclusive of the searched sequence)
-###is saved into a fasta (one fasta per pattern).  No file is written if no match is found.
+#####Then, look for that pattern 
+###A second fastx is iterated one time for each search pattern.
+###The first occurence of the pattern per read (inclusive of the searched tag sequences)
+###is saved into a fasta.  No file is written if no match is found.
 
 ###This program is intended to find unique 'tags' artificially placed into noisy long reads
 ###at the same known positions within each read. The intent is to generate MSA inputs bounded by
@@ -35,34 +36,33 @@ for tag in pysam.FastxFile(input_tags_fa):
 count = 0
 for tagA,tagB in zip(tags[:-1:],tags[1::]):
 	#print some tag identifiers
-	print(f"\nTAG{count} to TAG{count+1}")
-	print(f"{tagA[0:5]}   {tagB[0:5]}")
+	print(f"\nTAG{str(count).zfill(2)} to TAG{str(count+1).zfill(2)}")
+	#print(f"{tagA[0:5]}   {tagB[0:5]}")
 	
 	#Define the search parameter as any alphanumeric between the exact tags (inclusive of tags)
 	search_string = f"{tagA}\\w+{tagB}"
-	content = ""
+	content = []
 
 	#iterate through reads for this tag
 	for read in pysam.FastxFile(input_reads_fa):
-		print(read.name)
 		try:
 			subseq = re.search(search_string, read.sequence).group(0)
 			#if match found, append a new fasta entry with the matched string
-			print(len(subseq))
-			content += (">" + read.name + "\n")
-			content += (subseq + "\n")
+			print(f"{read.name[0:34]} - {len(subseq)}")
+			content.append(f">{read.name}")
+			content.append(subseq)
 		except AttributeError:
-			print("not found")
+			print(f"{read.name[0:34]} - Not found")
 
-	#if any matches are found for the pattern
-	if content:
+	#if more than one matches are found for the pattern
+	if len(content) > 2:
 		#make a directory using snakemake wildcard
 		path = "segment_reads/" + snakemake.wildcards["sample"]
 		os.makedirs(path, exist_ok=True)
 		#write the matched fasta entries for this tag
 		out_fa_file = f"{path}/seg_{str(count).zfill(2)}to{str(count+1).zfill(2)}_reads.fa"
 		with open(out_fa_file, "w") as out_fa:
-			out_fa.write(content)
+			out_fa.write("\n".join(content) + "\n")
 
 	#increase the counter
 	count += 1
