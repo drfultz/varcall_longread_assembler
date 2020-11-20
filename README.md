@@ -16,9 +16,9 @@ Run snakemake with the test file as the snakemake target and `--use-conda`.
 git clone https://github.com/drfultz/tagged_longread_assembler.git
 cd tagged_longread_assembler
 touch tagged_reads/test_tagreads.fa
-snakemake -j 1 --use-conda polished/test_polished2X.fa
+snakemake -j 1 --use-conda final_contigs/test_contig.fa
 ```
-It will likely take several minutes for conda to install all of the dependencies.  It will also take several minutes for the pipeline itself to run.  Upon completion, the initially empty file `polished/test_polished2X.fa` should be rewritten and should contain a single fasta entry.
+It will likely take several minutes for conda to install all of the dependencies.  It will also take several minutes for the pipeline itself to run.  Upon completion, the initially empty file `final_contigs/test_contig.fa` should be rewritten and should contain a single fasta entry.
 
 **Preparing your own inputs**\
 Preparing your inputs as fasta or fastq reads containing sequence tags is the time consuming and requires careful work.  Essentially, this step is manually mapping out where each read should be assembled for the pipeline. A GUI program for working with DNA sequence is practically necessary.  Geneious Prime works very well, but free alternatives like Genome Compiler, Unipro UGENE, or Benchling's sequence tools would likely suffice.
@@ -40,9 +40,9 @@ The order of the tags in the tag fasta file (from top to bottom) needs to match 
 4\) Insert the tags into the reads using GUI software. To perform the tag insertions using Geneious (Genome Compiler could likely perform similar steps):
 - A) View all of the reads in Geneious together (as a Geneious sequence list)
 - B) Use the '**Annotate from database**' tool to mark a relatively invariable region of your repeat on all of the reads (this annotation need not be long, 200bp works).  If possible, also annotate your unique feature(s) for clarity.
-![Alt text](./tagged_read_cartoon.svg)
 
 - C) Copy and paste each tag into the appropriate region on the first read.  Place the tags precisely upstream of each target annotation by clicking on the annotation, then pressing left arrow key followed by right arrow key to position the cursor.  Press **CTRL+V** to paste.  Don't forget to save changes regularly.
+![Alt text](./tagged_read_cartoon.svg)
 
 - D) Repeat step C) for every read.
 
