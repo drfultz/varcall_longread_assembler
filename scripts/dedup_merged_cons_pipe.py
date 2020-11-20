@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 import sys
-import re
-
 import pysam
 
 ###attempts to find a tandem duplication of each input tag.

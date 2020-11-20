@@ -1,4 +1,4 @@
-localrules: tagged_read_splitter, cons_calls, merge_cons
+localrules: tagged_read_splitter, cons_calls, merge_cons, remove_tags
 
 configfile: "config.yaml"
 
@@ -117,6 +117,20 @@ rule minimap2_racon2:
     shell:
         "minimap2 -a -L --secondary=no -t {params.ppn} -x map-ont {input[0]} {input[1]} | samtools view -h -F 2304 - > {output[0]} \n"
         "racon -t {params.ppn} {input[1]} {output[0]} {input[0]} > {output[1]} \n"
+
+rule remove_tags:
+    input:
+        config["Tag_set"],
+        "polished/{sample}_polished2X.fa"
+    output:
+        "final_contigs/{sample}_contig.fa"
+    conda:
+        "envs/pysam.yaml"
+    script:
+        "scripts/remove_tags_sm.py"
+
+
+
 
 
 #not currently used
