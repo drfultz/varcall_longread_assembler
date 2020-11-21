@@ -5,10 +5,21 @@ import pysam
 ###attempts to find a tandem duplication of each input tag.
 ###If found, collapses into single tag.
 
-input_tags_fa = sys.argv[1]
-input_seq = sys.stdin.read()
+input_tags_fa = snakemake.input.tag_fa
+input_seq_fastas = snakemake.input.cons
+output_fasta_file = snakemake.output[0]
 
-in_seq_upper = input_seq.upper() #changing all to uppercase eliminates issues where the read/tag junction is misaligned,
+###process and sort the input consensus filenames
+input_seq_fastas_list = str(input_seq_fastas).split()
+input_seq_fastas_list.sort()
+
+###concatenate the sequences from each file in order
+in_seq_joined = ""
+for input_seq_fasta in input_seq_fastas_list:
+	input_entry = list(pysam.FastxFile(input_seq_fasta))[0]
+	in_seq_joined = in_seq_joined + input_entry.sequence
+
+in_seq_upper = in_seq_joined.upper() #changing all to uppercase eliminates issues where the read/tag junction is misaligned,
 									#resulting in lowercase tag bases from cons command
 
 ###iterate the input tag sequences from the tags fasta
@@ -35,5 +46,6 @@ for tag in pysam.FastxFile(input_tags_fa):
 		#any read or not properly paired with an expected neighbor tag in the input reads
 		sys.stderr.write(f"Tag {tag.name} not present.\n")
 
-#write to stdout for piping
-sys.stdout.write(in_seq_upper)
+#write to file
+with open(output_fasta_file, "w") as output_fasta:
+	output_fasta.write(f">{snakemake.wildcards.sample}\n{in_seq_upper}")

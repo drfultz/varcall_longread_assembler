@@ -76,10 +76,9 @@ rule merge_cons:
         "merge_cons/{sample}_merge.fa"
     conda:
         "envs/pysam.yaml"
-    shell:
-        "echo '>{wildcards.sample}' > {output} \n"
-        """ls {input.cons} | xargs cat | awk '!/^>/ {{printf "%s", $0}} END {{printf RS}}' | scripts/dedup_merged_cons_pipe.py {input.tag_fa} >> {output}"""
-
+    script:
+        "scripts/dedup_merged_cons_sm.py"
+        
 #polishing of the draft consensus via minimap2 and racon
 #draft and reads still contain tags to ensure alignment at proper locations
 rule minimap2_racon:
