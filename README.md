@@ -50,7 +50,7 @@ The order of the tags in the tag fasta file (from top to bottom) needs to match 
 
 6\) Set the fasta file containing your sequence tags as the `Tag_set` value in the `config.yaml` file.
 
-7\) From the `tagged_longread_assembler` folder, run `snakemake -j 1 --use-conda {sample_name}_tagreads.fa` .  If you would like to use parallel threads for each MSA and cons step, set the `-j` value to the desired number of threads.
+7\) From the `tagged_longread_assembler` folder, run `snakemake -j 1 --use-conda final_contigs/{sample_name}_contig.fa` .  If you would like to use parallel threads for each MSA and cons step, set the `-j` value to the desired number of threads.
 
 **Pipeline Workflow**\
 Under construction
