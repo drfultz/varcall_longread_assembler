@@ -42,7 +42,7 @@ The order of the tags in the tag fasta file (from top to bottom) needs to match 
 - B) Use the '**Annotate from database**' tool to mark a relatively invariable region of your repeat on all of the reads (this annotation need not be long, 200bp works).  If possible, also annotate your unique feature(s) for clarity.
 
 - C) Copy and paste each tag into the appropriate region on the first read.  Place the tags precisely upstream of each target annotation by clicking on the annotation, then pressing left arrow key followed by right arrow key to position the cursor.  Press **CTRL+V** to paste.  Don't forget to save changes regularly.
-![Alt text](./tagged_read_cartoon.svg)
+![Alt text](./cartoon.svg)
 
 - D) Repeat step C) for every read.
 
