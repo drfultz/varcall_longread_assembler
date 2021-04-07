@@ -48,4 +48,4 @@ for tag in pysam.FastxFile(input_tags_fa):
 
 #write to file
 with open(output_fasta_file, "w") as output_fasta:
-	output_fasta.write(f">{snakemake.wildcards.sample}\n{in_seq_upper}")
+	output_fasta.write(f">{snakemake.wildcards.contig}\n{in_seq_upper}")

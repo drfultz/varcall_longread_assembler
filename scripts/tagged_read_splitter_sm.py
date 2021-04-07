@@ -57,7 +57,7 @@ for tagA,tagB in zip(tags[:-1:],tags[1::]):
 	#if more than one matches are found for the pattern
 	if len(content) > 2:
 		#make a directory using snakemake wildcard
-		path = "segment_reads/" + snakemake.wildcards["sample"]
+		path = "segment_reads/" + snakemake.wildcards["contig"]
 		os.makedirs(path, exist_ok=True)
 		#write the matched fasta entries for this tag
 		out_fa_file = f"{path}/seg_{str(count).zfill(2)}to{str(count+1).zfill(2)}_reads.fa"
