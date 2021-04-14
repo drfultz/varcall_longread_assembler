@@ -36,7 +36,7 @@ for tag in pysam.FastxFile(input_tags_fa):
 count = 0
 for tagA,tagB in zip(tags[:-1:],tags[1::]):
 	#print some tag identifiers
-	print(f"\nTAG{str(count).zfill(2)} to TAG{str(count+1).zfill(2)}")
+	print(f"\nTAG{str(count).zfill(3)} to TAG{str(count+1).zfill(3)}")
 	#print(f"{tagA[0:5]}   {tagB[0:5]}")
 	
 	#Define the search parameter as any alphanumeric between the exact tags (inclusive of tags)
@@ -60,7 +60,7 @@ for tagA,tagB in zip(tags[:-1:],tags[1::]):
 		path = "segment_reads/" + snakemake.wildcards["contig"]
 		os.makedirs(path, exist_ok=True)
 		#write the matched fasta entries for this tag
-		out_fa_file = f"{path}/seg_{str(count).zfill(2)}to{str(count+1).zfill(2)}_reads.fa"
+		out_fa_file = f"{path}/seg_{str(count).zfill(3)}to{str(count+1).zfill(3)}_reads.fa"
 		with open(out_fa_file, "w") as out_fa:
 			out_fa.write("\n".join(content) + "\n")
 
