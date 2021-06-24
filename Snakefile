@@ -102,8 +102,8 @@ rule minimap2_racon:
         "mappings_polish/{contig}_to_raw.sam",
         "polished/{contig}_polished1X.fa"
     params:
-        ppn="2",
-        vmem="8gb",
+        ppn="4",
+        vmem="12gb",
         walltime="20:00:00"
     conda:
         "envs/minimap2_racon.yaml"
@@ -121,8 +121,8 @@ rule minimap2_racon2:
         "mappings_polish/{contig}_to_1X.sam",
         "polished/{contig}_polished2X.fa"
     params:
-        ppn="2",
-        vmem="8gb",
+        ppn="4",
+        vmem="12gb",
         walltime="20:00:00"
     conda:
         "envs/minimap2_racon.yaml"

@@ -3,9 +3,9 @@
 #PBS -m abe
 #PBS -e logs/master-sm_${PBS_JOBID}.err
 #PBS -o logs/master-sm_${PBS_JOBID}.out
-#PBS -M drfultz@iu.edu
+#PBS -M d@iu.edu
 #PBS -l nodes=1:ppn=1,vmem=8gb,walltime=36:00:00
-#PBS -d /N/slate/drfultz/working_tagged_longread_assembler/
+#PBS -d /N/slate/d/working_tagged_longread_assembler/
 
 TARGET=final_contigs/NOR2-tel_contig.fa
 
