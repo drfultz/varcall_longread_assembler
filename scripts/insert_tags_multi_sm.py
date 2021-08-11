@@ -138,4 +138,5 @@ with open(features_file, 'r') as feature_file_obj, open(tagged_reads_file,'w') a
 
 			### if more than one match, exception
 			elif len(matched_feature) > 1:
-				raise Exception(f"\nPattern\n{pattern}\nwas present more than once in a single read\n")
+				print (f"\nPattern\n{pattern}\nwas present more than once in read {mask_feature_line[0]}\n")
+				#raise Exception(f"\nPattern\n{pattern}\nwas present more than once in a single read\n")

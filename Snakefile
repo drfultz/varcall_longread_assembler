@@ -90,7 +90,7 @@ rule merge_cons:
     conda:
         "envs/pysam.yaml"
     script:
-        "scripts/dedup_merged_cons_sm.py"
+        "scripts/merge_cons_sm.py"
         
 #polishing of the draft consensus via minimap2 and racon
 #draft and reads still contain tags to ensure alignment at proper locations
