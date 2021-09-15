@@ -9,7 +9,8 @@ rule insert_tags:
         "loci_patterns/{contig}_patterns.tsv",
         config["Tag_set"]
     output:
-        "tagged_reads/{contig}_tagreads.fq",
+        "used_readnames/{contig}_usedreadnames.txt",
+        "tagged_reads/{contig}_tagreads.fq"
     conda:
         "envs/pysam.yaml"
     script:

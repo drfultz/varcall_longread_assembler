@@ -3,6 +3,7 @@ import sys
 import re
 import csv
 import pysam
+import glob
 
 # features_file = sys.argv[1]
 # input_reads_file = sys.argv[2]
@@ -15,8 +16,8 @@ features_file = snakemake.input[0]
 input_reads_file = snakemake.input[1]
 search_patterns_file = snakemake.input[2]
 input_tags_file = snakemake.input[3]
-tagged_reads_file = snakemake.output[0]
-used_readnames_file = "%s_usedreadnames.txt" % (input_reads_file.split('.', 1)[0])
+used_readnames_file = snakemake.output[0]
+tagged_reads_file = snakemake.output[1]
 
 
 ##### Parse the search patterns and distances
@@ -31,9 +32,20 @@ if (len(patterns) - len(spacings)) != 0:
 #print(patterns)
 #print(spacings)
 
+##### Create a fresh used_readnames_file for this contig
+with open(used_readnames_file, 'w') as used_readnames_file_obj:
+	pass
+
+##### gather the used readnames
+used_readnames = []
+for other_used_readnames_file in glob.glob("used_readnames/*_usedreadnames.txt"):
+	with open(other_used_readnames_file, 'r') as other_used_readnames:
+		for line in other_used_readnames:
+			used_readnames.append(line.strip())
+#print(used_readnames)
+
 ##### Define tag insertion function for later
 def tagit(tag, site, seq, qual):
-
 	## insert tag into the sequence
 	first_seq = seq[:site]
 	second_seq = seq[site:]
@@ -51,12 +63,10 @@ def tagit(tag, site, seq, qual):
 	return tagged_sequence, tagged_quality
 
 ##### Open and loop through the features file for matching the patterns and inserting tags
-with open(features_file, 'r') as feature_file_obj, open(tagged_reads_file,'w') as tagged_reads, open(used_readnames_file, 'r+') as used_readnames_file_obj:
+with open(features_file, 'r') as feature_file_obj, open(tagged_reads_file,'w') as tagged_reads, open(used_readnames_file, 'w') as used_readnames_file_obj:
 
 	### 'Mask' the readnames from the blacklist of used readnames
 	feature_reader = csv.reader(feature_file_obj, delimiter='\t', quoting=csv.QUOTE_NONE)
-	used_readnames = [line.strip() for line in used_readnames_file_obj]
-	print(used_readnames)
 	masked_feature_lines = []
 	for feature_line in feature_reader:
 		if feature_line[0] not in used_readnames:
@@ -79,7 +89,7 @@ with open(features_file, 'r') as feature_file_obj, open(tagged_reads_file,'w') a
 
 			### if one match
 			if len(matched_feature) == 1:
-				print(f"\nread {mask_feature_line[0]} matched with pattern at offset {offset}")
+				print(f"read {mask_feature_line[0]} matched with pattern at offset {offset}")
 
 				### loop through the fastq, looking for the first matching readname
 				for input_read in pysam.FastxFile(input_reads_file):
@@ -99,22 +109,15 @@ with open(features_file, 'r') as feature_file_obj, open(tagged_reads_file,'w') a
 						#print(L_features)
 						num_L_units = len(L_features.split(",")) - 1
 
-						## Old bad logic
-						# if L_features: #if L_features is not an empty string.
-						# 	num_L_units = len(L_features.split(",")) - 1
-						# else: #if L_features is an empty string, set num_L_units to 0 to avoid len(L_features.split(",")) setting it to 1
-						# 	print("\n\nNO LEFT\n\n")
-						# 	num_L_units = 0
-
-						print(f"\tnumber units {num_units}")
-						print(f"\tleft units {num_L_units}")
+						#print(f"\tnumber units {num_units}")
+						#print(f"\tleft units {num_L_units}")
 
 						## Loop backwards (so as not to disturb downstream insertion sites)
 						## through each units, adding tags
 						for n in range(num_units-1, 0, -1):
 							start_tag_num = n-num_L_units+10+offset
 							start_site = int(feature_starts[n])
-							print(f"\tinserting tag #{start_tag_num}, named {input_tags[start_tag_num].name}, into pos {start_site}")
+							#print(f"\tinserting tag #{start_tag_num}, named {input_tags[start_tag_num].name}, into pos {start_site}")
 							working_seq, working_qual = tagit(input_tags[start_tag_num], start_site, working_seq, working_qual)
 
 						## Write the tagged read output

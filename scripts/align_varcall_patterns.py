@@ -54,6 +54,7 @@ with open(features_file,'r') as features_file_object:
 
 			features_parsed.append([readname, features_lol, num_L_units, num_R_units])
 
+print(f"coverage = {len(features_parsed)}",file=sys.stderr)
 
 ##### Make preperations for finding and processing reads that extend the furthest 5' from the pattern
 ## Define a function that outputs one unit of variant calls, limited to a certain number of features,
