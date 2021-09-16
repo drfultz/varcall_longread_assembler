@@ -1,3 +1,3 @@
-Feature-calls_file: 50kb_ONT_allColto5-19_all-reads_combined.feat
-Oriented_fastq_file: 50kb_ONT_allColto5-19_all-reads_combined_oriented.fq
+Feature-calls_file: test.feat
+Oriented_fastq_file: test.fq
 Tag_set: tags/10kb_tags.fasta

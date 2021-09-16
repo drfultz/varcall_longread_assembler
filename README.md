@@ -15,8 +15,8 @@ Run snakemake with the test file as the snakemake target and `--use-conda`.
 ```
 git clone https://github.com/drfultz/tagged_longread_assembler.git
 cd tagged_longread_assembler
-touch tagged_reads/test_tagreads.fa
-snakemake -j 1 --use-conda final_contigs/test_contig.fa
+touch loci_patterns/test-tel_patterns.tsv
+snakemake -j 1 --use-conda final_contigs/test-tel_contig.fa
 ```
 It will likely take several minutes for conda to install all of the dependencies.  It will also take several minutes for the pipeline itself to run.  Upon completion, the initially empty file `final_contigs/test_contig.fa` should be rewritten and should contain a single fasta entry.
 

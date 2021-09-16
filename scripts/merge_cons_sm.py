@@ -2,12 +2,18 @@
 import sys
 import pysam
 
-###attempts to find a tandem duplication of each input tag.
-###If found, collapses into single tag.
+#####Trims the 3' tags off of each consensus sequence and concatenates them.
 
 input_tags_fa = snakemake.input.tag_fa
 input_seq_fastas = snakemake.input.cons
 output_fasta_file = snakemake.output[0]
+
+
+###measure the length of the input tags.  This assumes all tags are of the same length.
+with open(input_tags_fa, 'r') as input_tags_fa_obj:
+	second_line = input_tags_fa_obj.readlines()[1]
+	tag_length = len(second_line.split()[0])
+	print(tag_length)
 
 ###process and sort the input consensus filenames
 input_seq_fastas_list = str(input_seq_fastas).split()
@@ -15,10 +21,10 @@ input_seq_fastas_list.sort()
 
 ###concatenate the sequences from each file in order
 in_seq_joined = ""
-#loop through the sequences except the final one, trimming the last 10000 bp of each
+#loop through the sequences except the final one, trimming the last tag_length bases
 for input_seq_fasta in input_seq_fastas_list[:-1]:
 	input_entry = list(pysam.FastxFile(input_seq_fasta))[0]
-	in_seq_joined = in_seq_joined + input_entry.sequence[:-10000] #ought to change to remove based on length of used tags
+	in_seq_joined = in_seq_joined + input_entry.sequence[:-tag_length]
 
 #Add final sequence, since it needs to retain final tag
 last_entry = list(pysam.FastxFile(input_seq_fastas_list[-1]))[0]
