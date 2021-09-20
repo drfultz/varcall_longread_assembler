@@ -26,9 +26,13 @@ with open(search_patterns_file, 'r') as search_pattern_object:
 	patterns = first_line.split('\t')
 	second_line = search_pattern_object.readline().strip()
 	spacings = second_line.split('\t')
+
+if " " in first_line or " " in second_line:
+	raise Exception("\nThere should not be space characters present in the _patterns.tsv file.\n")
+
 if (len(patterns) - len(spacings)) != 0:
 	print()
-	raise Exception(f"The number of search patterns {len(patterns)} (first line) should equal the number of spacings {len(spacings)} (second line)")
+	raise Exception(f"\nThe number of search patterns {len(patterns)} (first line) should equal the number of spacings {len(spacings)} (second line).\n")
 #print(patterns)
 #print(spacings)
 
