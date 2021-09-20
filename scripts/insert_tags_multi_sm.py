@@ -66,6 +66,7 @@ def tagit(tag, site, seq, qual):
 	#print(f"  q + {len(tag_qual)} = {len(tagged_quality)}")
 	return tagged_sequence, tagged_quality
 
+output_written = False
 ##### Open and loop through the features file for matching the patterns and inserting tags
 with open(features_file, 'r') as feature_file_obj, open(tagged_reads_file,'w') as tagged_reads, open(used_readnames_file, 'w') as used_readnames_file_obj:
 
@@ -133,6 +134,8 @@ with open(features_file, 'r') as feature_file_obj, open(tagged_reads_file,'w') a
 
 						used_readnames_file_obj.write(input_read.name + "\n")
 
+						output_written = True #to test if anything has been output later
+
 						## only first input read found
 						break
 
@@ -143,7 +146,9 @@ with open(features_file, 'r') as feature_file_obj, open(tagged_reads_file,'w') a
 				### break looping through further patterns after one is found
 				break
 
-			### if more than one match, exception
+			### if more than one match, print warning
 			elif len(matched_feature) > 1:
 				print (f"\nPattern\n{pattern}\nwas present more than once in read {mask_feature_line[0]}\n")
 				#raise Exception(f"\nPattern\n{pattern}\nwas present more than once in a single read\n")
+if output_written == False:
+	raise Exception("\n\tNo proper matches were found for any pattern.\n")
