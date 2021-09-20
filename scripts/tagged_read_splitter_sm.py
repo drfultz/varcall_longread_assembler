@@ -32,11 +32,14 @@ for tag in pysam.FastxFile(input_tags_fa):
 	tags.append(tag.sequence)
 
 
-#iterate through each tag, paired with the subsequent tag
 count = 0
+in_interior = False
+out_interior = False
+
+#iterate through each tag, paired with the subsequent tag
 for tagA,tagB in zip(tags[:-1:],tags[1::]):
 	#print some tag identifiers
-	print(f"\nTAG{str(count).zfill(3)} to TAG{str(count+1).zfill(3)}")
+	print(f"TAG{str(count).zfill(3)} to TAG{str(count+1).zfill(3)}")
 	#print(f"{tagA[0:5]}   {tagB[0:5]}")
 	
 	#Define the search parameter as any alphanumeric between the exact tags (inclusive of tags)
@@ -48,14 +51,15 @@ for tagA,tagB in zip(tags[:-1:],tags[1::]):
 		try:
 			subseq = re.search(search_string, read.sequence).group(0)
 			#if match found, append a new fasta entry with the matched string
-			print(f"{read.name[0:34]} - {len(subseq)}")
+			print(f"\t{read.name[0:34]} - {len(subseq)}")
 			content.append(f">{read.name}")
 			content.append(subseq)
 		except AttributeError:
-			print(f"{read.name[0:34]} - Not found")
+			pass
+			#print(f"{read.name[0:34]} - Not found")
 
 	#if more than one matches are found for the pattern
-	if len(content) > 2:
+	if len(content) > 3 and out_interior == False:
 		#make a directory using snakemake wildcard
 		path = "segment_reads/" + snakemake.wildcards["contig"]
 		os.makedirs(path, exist_ok=True)
@@ -63,6 +67,14 @@ for tagA,tagB in zip(tags[:-1:],tags[1::]):
 		out_fa_file = f"{path}/seg_{str(count).zfill(3)}to{str(count+1).zfill(3)}_reads.fa"
 		with open(out_fa_file, "w") as out_fa:
 			out_fa.write("\n".join(content) + "\n")
+		in_interior = True
+
+	elif len(content) < 3 and in_interior == True and out_interior == False:
+		out_interior = True
+		print("\n\t1st coverage drop\n")
+
+	elif len(content) > 3 and out_interior == True:
+		raise Exception("\nCoverage for a region between two tags dropped below 2 then went back up again, indicating a hole in this assembly.\n")
 
 	#increase the counter
 	count += 1
