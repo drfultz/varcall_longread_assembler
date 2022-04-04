@@ -2,6 +2,7 @@
 import sys
 import csv
 import re
+import math
 
 if len(sys.argv) != 4:
 	print("\tERROR: please input a .feat file, a patterns file, and an estimated coverage value. Writes to stdout.")
@@ -50,6 +51,7 @@ for pattern in patterns:
 		count += len(resplit_feature_entry) - 1
 
 	pat_len = pattern.count("+,") + 1
-	norm_count = 100 * count / (distribution[pat_len] / norm_factor)
+	norm_FC = math.log2((count + 0.0000001)/ (distribution[pat_len] / norm_factor))
 
-	print(f"{pattern}\t{count}\t{norm_count}")
+	print(f"{pattern}\t{count}\t{norm_FC}")
+	
