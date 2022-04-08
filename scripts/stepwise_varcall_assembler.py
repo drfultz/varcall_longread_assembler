@@ -12,20 +12,41 @@ if len(sys.argv)!=5:
 
 feat_file = sys.argv[1]
 est_cov = int(sys.argv[2])
-current_pattern = sys.argv[3]
+start_pattern = sys.argv[3]
 max_SVkmer_len = int(sys.argv[4])
 
-patterns_out = feat_file.split(".")[0] + "_patterns.tsv"
+patterns_out = f"""{feat_file.split(".")[0]}_v3_patterns.tsv"""
+alignment_out = f"""{feat_file.split(".")[0]}_v3_SValign.tsv"""
 
-### read in the feat file
+##### read in the feat file
 with open(feat_file, 'r') as feat_obj:
 	feat_fields = []
 	switch = False
-	for line in csv.reader(feat_obj, delimiter = "\t"):
-		# ignore "^" markers on calls
-		feat_fields.append(line[1].replace("^",""))
+	for tsv_line in csv.reader(feat_obj, delimiter = "\t"):
+
+		split_units = tsv_line[1].split(",")
+		trimmed_units = []
+		### loop through each unit
+		for u, unit in enumerate(split_units):
+			## if first or last unit
+			if u == 0 or u == (len(split_units)-1):
+				# keep unit if any call is not Unmapped
+				for subunit in unit.split("&"):
+					if subunit[-8:] != "Unmapped":
+						trimmed_units.append(unit)
+						break
+				# else: # no break
+				# 	print(f"all unmapped {u}")
+			## keep all internal units
+			else:
+				trimmed_units.append(unit)
+
+		# join trimmed units back together, ignore "^" markers on calls, and put into list
+		feat_fields.append(",".join(trimmed_units).replace("^",""))
+
+		# count number of features for first line
 		if switch == False:
-			num_features_present = len(line[1].split(",")[0].split("&"))
+			num_features_present = len(tsv_line[1].split(",")[0].split("&"))
 			switch = True
 
 ##### Make distribution of unit length counts and normalize
@@ -42,7 +63,6 @@ for features in feat_fields:
 		else:
 			distribution[x] = num_wins
 		num_wins += 1
-
 norm_factor = distribution[1] / est_cov
 
 def align_varcall_table(search_pattern, varcalls, num_feat, spacing):
@@ -97,19 +117,15 @@ def align_varcall_table(search_pattern, varcalls, num_feat, spacing):
 
 	return aligned_features
 
-##### align patterns and find new ones until can't find unique pattern or consensus is ambiguous
-contiguous = True
-patterns_line = [current_pattern]
-spacing_line = ["0"]
-absolute_spacing = 40 #!!!!! need to fix this
-while contiguous == True:
+def make_varcall_consensus(search_pattern1, varcalls1, num_feat1):
 	### align current pattern
-	current_table = align_varcall_table(current_pattern, feat_fields, num_features_present, absolute_spacing)
+	current_table = align_varcall_table(search_pattern1, varcalls1, num_feat1, 0)
 	tp_current_table = list(map(list, zip(*current_table)))
 
 	### evaluate and make consensus
 	## for column in original table (using transposed table)
 	consensus_calls = []
+	good_columns = True
 	for col in tp_current_table:
 		col_total = 0
 		calls = {}
@@ -126,13 +142,21 @@ while contiguous == True:
 				else:
 					calls[field] = 1
 
-		## make a consensus
+		## make a consensus if 4 or more in column
 		if col_total >= 4:
 			highest_count = 0
 			for call in calls:
 				if calls[call] > highest_count:
 					consensus_call = call
 					highest_count = calls[call]
+			## don't keep low consensus
+			if highest_count < 0.5*col_total:
+				consensus_call = "--"
+			## don't keep Unmapped consensus for low cov
+			if col_total <= 6 and consensus_call[-8:] == "Unmapped":
+				consensus_call = "--"
+
+		## else, empty consensus value
 		else:
 			consensus_call = "-"
 		consensus_calls.append(consensus_call)
@@ -147,23 +171,10 @@ while contiguous == True:
 						col_mismatches += 1
 			## reject if any single column shows a divided pattern
 			if col_mismatches/col_total > .3:
-				contiguous = False
-				print("bad column")
+				good_columns = False
+				print("\nbad column")
 				print(col)
 
-	### print alignment table and consensus regardless of quality
-	print("\n" + current_pattern)
-	for aligned_line in current_table:
-		print("\t".join(aligned_line))
-	#print("\t".join(consensus_calls))
-
-	### stop if columns bad
-	if contiguous == False:
-		break
-
-
-	##### look for next search pattern
-	#####
 	### convert consensus back to string for re searching
 	cons_string = ""
 	for i, cons_call in enumerate(consensus_calls, start=1):
@@ -172,67 +183,120 @@ while contiguous == True:
 				cons_string += cons_call + "&"
 			else:
 				cons_string += cons_call + ","
-	#print(cons_string)
 
-	## Find pattern by re.split
-	resplit_cons = re.split(r'(%s)' % current_pattern, cons_string[:-1]) #cons string has trailing character
+	return cons_string, good_columns
 
-	## If pattern is found, parse it
-	if len(resplit_cons) < 3:
-		raise Exception("\npattern not found in consensus.\n")
-	else:
-		R_set = resplit_cons[2].split(",")
-	#print("\t".join(R_set))
+##### align patterns and find new ones until can't find unique pattern or consensus is ambiguous
+### align and test start pattern
+start_cons_string, good_start = make_varcall_consensus(start_pattern, feat_fields, num_features_present)
 
-	### Greedy search for next pattern
-	## loop sizes first
-	for size in range(1,max_SVkmer_len+1):
-		## loop through right most patterns, back to left
-		for w in range(1,len(R_set[size:])+1):
-			#print(f"{-w-size}\t{-w}")
-			current_set = R_set[(-w-size):-w]
+if good_start == False:
+	raise Exception("\nInitial pattern contains mismatching variant calls.\n")
 
-			## make string
-			pre_re_string = r""
-			pre_re_string += ",".join(current_set)
+### setup
+patterns_line = [start_pattern]
+spacing_line = ["50"]
 
-			## using lookahead with internal capture to not consume overlapping matches
-			re_string = r"(?=(" + pre_re_string + r"))"
-			#print(re_string)
+### go forward and reverse
+for F in [True,False]:
+	## initial setup for each direction
+	contiguous = True
+	current_cons_string = start_cons_string
+	current_pattern = start_pattern
+	print(f"search_pattern\trelative_spacing\texp_cov\tactual_cov")
 
-			## count occurences
-			count = 0
-			for feat_field in feat_fields:
-				count += len(re.findall(re_string, feat_field))
+	##### main search loop
+	### loop until a break or not contiguous
+	while contiguous == True:
 
-			## if expected coverage found, keep as next pattern
-			current_exp_cov = distribution[len(current_set)] / norm_factor
-			#print(f"{current_exp_cov}\t{count}")
-			if 0.7*current_exp_cov <= count <= 1.3*current_exp_cov:
-				#
-				relative_spacing = resplit_cons[1].count(",") + len(R_set) - w - size
-				absolute_spacing += relative_spacing
-				print(f"\n{relative_spacing}\t{current_exp_cov}\t{count}")
-				current_pattern = pre_re_string
+		## Find pattern by re.split
+		resplit_cons = re.split(r'(%s)' % current_pattern, current_cons_string[:-1]) #cons string has trailing character
 
-				### generate outputs
-				patterns_line.append(current_pattern)
-				spacing_line.append(str(relative_spacing))
-				break
+		## check that pattern was found
+		if len(resplit_cons) < 3:
+			raise Exception("\npattern not found in consensus.\n")
 
-		else: # no break at this size
-			# Continue the outer loop
-			continue
-		# inner loop was broken, break the outer.
-		break
+		## setup for search based on direction
+		## take the appropriate half of resplit string, split into list at "," and replace double dashes
+		if F is True:
+			half_set = [s_unit.replace("--","[^,]+") for s_unit in resplit_cons[2].split(",")]
+		else:
+			half_set = [s_unit.replace("--","[^,]+") for s_unit in resplit_cons[0].split(",")]
 
-	else: # no break in finding new pattern
-		break # break out of building patterns
+		### Greedy search for next pattern
+		## loop sizes first
+		for size in range(1,max_SVkmer_len+1):
+			## loop through number of windows available for this size
+			for w in range(len(half_set[size:])):
+
+				## define window to examine based on direction
+				if F is True:
+					print(f"{-w-size-1}\t{-w-1}")
+					current_win = half_set[(-w-size-1):(-w-1)]
+				else:
+					print(f"{w}\t{w+size}")
+					current_win = half_set[w:(w+size)]
+
+				## make string
+				pre_re_string = r""
+				pre_re_string += ",".join(current_win)
+
+				## using lookahead with internal capture to not consume overlapping matches
+				re_string = r"(?=(" + pre_re_string + r"))"
+				#print(re_string)
+
+				## count occurences
+				count = 0
+				for feat_field in feat_fields:
+					count += len(re.findall(re_string, feat_field))
+
+				## if expected coverage found
+				current_exp_cov = distribution[len(current_win)] / norm_factor
+				if 0.7*current_exp_cov <= count <= 1.3*current_exp_cov:
+					## and aligment is good
+					new_cons_string, current_good = make_varcall_consensus(pre_re_string, feat_fields, num_features_present)
+					if current_good is True:
+
+						## set as next pattern
+						current_cons_string = new_cons_string
+						current_pattern = pre_re_string
+
+						## determine outputs based on direction
+						if F is True:
+							relative_spacing = resplit_cons[1].count(",") + len(half_set) - w - 1 - size
+							patterns_line.append(current_pattern)
+							spacing_line.append(str(relative_spacing))
+						else:
+							relative_spacing = len(half_set) - w - 1
+							patterns_line.insert(0, current_pattern)
+							spacing_line[0] = str(relative_spacing)
+							spacing_line.insert(0, "50")
+
+						print(f"{current_pattern}\t{relative_spacing}\t{current_exp_cov}\t{count}")
+						break
+
+			else: ## no break at this size
+				## Continue the outer loop
+				continue
+			## inner loop was broken, break the outer.
+			break
+
+		else: ## no break in finding new pattern, end search in this direction
+			contiguous = False
 
 ##### Output patterns file
 with open(patterns_out, 'w') as patterns_obj:
 	patterns_obj.write("\t".join(patterns_line) + "\n")
 	patterns_obj.write("\t".join(spacing_line) + "\n")
+
+##### Output alignment file
+with open(alignment_out, 'w') as alignment_obj:
+	abs_spacing = 0
+	for pattern,rel_spacing in zip(patterns_line,spacing_line):
+		abs_spacing += int(rel_spacing)
+		for out_line in align_varcall_table(pattern, feat_fields, num_features_present, abs_spacing):
+			alignment_obj.write("\t".join(out_line) + "\n")
+		alignment_obj.write("\n")
 
 
 # #####
