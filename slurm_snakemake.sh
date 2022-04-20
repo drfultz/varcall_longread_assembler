@@ -5,25 +5,25 @@
 #SBATCH -e sm_master_%j.err
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=d@iu.edu
-#SBATCH -D /N/slate/d/working_tagged_longread_assembler
+#SBATCH -D /N/slate/d/tagged_longread_assembler
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
 #SBATCH --mem-per-cpu=8G
 #SBATCH --time=36:00:00
 
-TARGET=final_contigs/NOR2-LR_contig.fa
+TARGET=final_contigs/test-tel_contig.fa
 
 source ~/.bashrc
 conda activate snakemake
 
 snakemake --cluster 'sbatch \
--J sm_master \
+-J sm_sub \
 -p general \
 -o logs/{wildcards.contig}_{rule}_${{SLURM_JOBID}}.out \
 -e logs/{wildcards.contig}_{rule}_${{SLURM_JOBID}}.err \
 --mail-type=ALL \
---mail-user=drfultz@iu.edu \
+--mail-user=d@iu.edu \
 --nodes=1 \
 --ntasks=1 \
 --cpus-per-task={params.ppn} \

@@ -95,7 +95,6 @@ def align_varcall_table(search_pattern, varcalls, num_feat, spacing):
 
 			## split the features entry into units and calls and put into lol
 			split_features.append([line.replace("&",",").split(","), num_L_units, num_R_units])
-			##maybe use this part to trim any leading or trailing unmapped calls
 
 	### calculate spacing offset for whole contig
 	extra_spacing = spacing - L_offset
@@ -191,6 +190,12 @@ def make_varcall_consensus(search_pattern1, varcalls1, num_feat1):
 start_cons_string, good_start = make_varcall_consensus(start_pattern, feat_fields, num_features_present)
 
 if good_start == False:
+	### write the alignment for troubleshooting
+	with open(alignment_out, 'w') as alignment_obj:
+		for out_line in align_varcall_table(start_pattern, feat_fields, num_features_present, 0):
+			alignment_obj.write("\t".join(out_line) + "\n")
+
+	### end script
 	raise Exception("\nInitial pattern contains mismatching variant calls.\n")
 
 ### setup
@@ -294,9 +299,9 @@ with open(alignment_out, 'w') as alignment_obj:
 	abs_spacing = 0
 	for pattern,rel_spacing in zip(patterns_line,spacing_line):
 		abs_spacing += int(rel_spacing)
+		alignment_obj.write("\t"*abs_spacing*num_features_present + pattern + "\n")
 		for out_line in align_varcall_table(pattern, feat_fields, num_features_present, abs_spacing):
 			alignment_obj.write("\t".join(out_line) + "\n")
-		alignment_obj.write("\n")
 
 
 # #####
