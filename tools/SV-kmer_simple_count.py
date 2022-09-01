@@ -4,7 +4,9 @@ import csv
 import re
 import itertools
 
-###
+###Takes a .feat file and counts the number of occurences of SV sequence 'kmers' using
+###only SVs defined in the second input, at a single length of SV kmer defined by third input.
+###Can be used on long read .feat files and assembly .feat files.
 
 if len(sys.argv)!=4:
 	print("\tERROR: please input a .feat file, a file with target SVs, and the length of SV kmers")
@@ -36,12 +38,15 @@ with open(feat_file, 'r') as feat_obj:
 ###find the SV kmers
 for int_combo in itertools.product(*[all_combos for i in range(max_SVkmer_len)]):
 	pre_re_string = r""
+	unit_pieces = []
 	for unit in int_combo:
 		unit_piece = "[^,]*".join(unit)
-		pre_re_string += unit_piece + "[^,]*,[^,]*"
+		unit_pieces.append(unit_piece)
 
-	re_string = r"(?=(" + pre_re_string[:-11] + r"))"
-	# print(re_string)
+	pre_re_string = "[^,]*,[^,]*".join(unit_pieces)
+
+	re_string = r"(?=(" + pre_re_string + r"))"
+	#print(re_string)
 
 	count = 0
 	for feat_field in feat_fields:
