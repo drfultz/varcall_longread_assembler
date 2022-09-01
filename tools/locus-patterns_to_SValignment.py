@@ -105,7 +105,7 @@ def align_varcall_table(search_pattern, varcalls, num_feat, spacing):
 
 
 ##### Output alignment file
-abs_spacing = 0
+abs_spacing = 10 # in case reads 'back up' ahead of pattern
 for pattern,rel_spacing in zip(patterns_line,spacings_line):
 	abs_spacing += int(rel_spacing)
 	print("\t"*abs_spacing*num_features_present + pattern)
