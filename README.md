@@ -1,16 +1,15 @@
-
-
 ## tagged_longread_assembler
  A snakemake pipeline for assisting assembly of long DNA reads in difficult to assemble regions
 
 ### Introduction
-Long-read sequencing (Oxford Nanopore MinION, Pacific Biosciences SMRT) has vastly improved our ability to assemble complete genomes.  However, even the longest reported reads from these methods (which extend into megabase lengths) are insufficient to span repeat regions commonly found within eukaryotic genomes, for example 45S gene repeats.  While there are often polymorphisms among repeat copies, the inaccuracy of long-read methods can limit their usefullness for assembly.  This poses a challenge for existing DNA assembly software, which relies primarily on the per-base identity between reads.  However, repeat regions may have structural variants or other identifiable landmarks that are missed by assemblers but contain sufficient information, even within noisy reads, to allow assembly.
-This pipeline uses existing tools and custom scripts to generate and polish a consensus sequence with long reads from difficult to assemble regions.  Currently, this tool only assists in the final steps of assembly, relying on the user to identify unique features like structural variants and map them out using scaffolding reads (typically through its sister pipeline `perread_var_call`).  With this user-provided map, `tagged_longread_assembler` gathers reads that contain these unique features and places unique 'sequence tags' into the reads based on their position in the map.  These tags act like anchors in the reads, forcing them to properly align in downstream MSAs and mappings.  Draft sequence is built by parallel MSAs across the entire scaffolded region.  The draft is then polished via multiple rounds of `racon`.
+Long-read sequencing (Oxford Nanopore's MinION and Pacific Biosciences' SMRT) has vastly improved our ability to assemble complete genomes.  However, even the longest reported reads from these methods are typically insufficient to span repeat regions commonly found within eukaryotic genomes, for example 45S gene repeats.  While there are often polymorphisms among repeat copies, the inaccuracy of long-read methods can limit their usefullness for assembly.  However, repeat regions may have structural variants (SVs) or other identifiable landmarks that are missed by typical assemblers but contain sufficient information to allow assembly.
+This pipeline uses existing tools and custom scripts to generate and polish a consensus sequence with long reads from difficult to assemble regions.  Currently, the main pipeline only assists in the final steps of assembly.  It first requires the user to identify features like structural variants, perform variant calling through its sister pipeline `perread_var_call`, and generate a map of unique sequences of SVs by hand and/or with the use of the included `tools/stepwise_varcall_assembler.py`.  Once this map of search patterns (for the unique sequences of SVs) is created, `tagged_longread_assembler` gathers reads that contain these search patterns and places unique 'sequence tags' into the reads based on their position in the map.  These tags act like anchors in the reads, forcing them to properly align in downstream MSAs and mappings.  Draft sequence is built by parallel MSAs across the entire scaffolded region.  The draft is then polished via multiple rounds of `racon`.
 
-##### Requirements
-The pipeline is designed to be run by `snakemake` using its built-in interface with the package manager `conda`.  If needed, install`conda`, then use `conda` to install `snakemake`.  Then, `snakemake` will install all other dependencies when the pipeline is first run with the `--use-conda` option (as below).  Very basic knowledge of `snakemake` usage will be helpful in working with this pipeline.
+#### Getting started
+The pipeline is designed to be run by `snakemake` using its built-in interface with the package manager `conda`.  If needed, install conda, then use `conda` to install `snakemake` (using version 5.32.0 can save some trouble later).  Then, `snakemake` will install all other dependencies when the pipeline is first run with the `--use-conda` option (as below).  Basic knowledge of `snakemake` usage will be helpful in working with this pipeline.
 
-##### Getting started
+
+For each genome that you intend to assemble, **install a new copy of this pipeline**.
 ```
 git clone https://github.com/drfultz/tagged_longread_assembler.git
 cd tagged_longread_assembler
@@ -20,17 +19,21 @@ snakemake -j 1 --use-conda final_contigs/test-tel_contig.fa
 Included in the repository are test inputs and a matching final output that is initially empty.  It will likely take several minutes for `conda` to install all of the dependencies.  It will also take several minutes for the pipeline itself to run.  Upon completion, the initially empty file `final_contigs/test_contig.fa` should be rewritten and should contain a single fasta entry.
 
 ### Running your own assembly
-In order to run your own assembly, pass your reads through `perread_var_call`.  The resulting feature calls file (.feat) will allow you to create a map of your assembly and run the assembly pipeline
+##### Identify SVs and perform variant calling on your reads
+In order to run your own assembly, first define sets of SVs or other polymorphisms within your repeats.
+Next, pass your reads through `perread_var_call` (refer to instructions there) using those SVs.  You will need the resulting feature calls file (.feat) and matching `_oriented.fq` from this pipeline.
+You will also need an estimate of the fold coverage that your `_oriented.fq` provides for your region of interest. If your original sequencing was done without enrichment of your repeats, the fold coverage for the rest of the genome is a good guess.  Regardless of enrichment, if there is sequence internal to your repeats that is unique - a transposable element, gene, etc - this can be a good internal way to estimate coverage of your `_oriented.fq`.
 
 ##### Generate the assembly map
-Expand this section.
-Use `scripts/SV-kmer_simple_count.py` to look for unique loci (based on expected coverage) as starting points, then use `scripts/align_varcall_patterns.py` to explore how these loci connect.
+This is the core of the assembly itself - this defines where each read belongs within your region of interest.  Later steps within this pipeline are not designed to evaluate the accuracy of your map or read placement.  In other words, the rest of this pipeline is dumb and will do exactly what you tell it to do via the map you create, so however you generate the map, **check and double check it**.
+
+One way to start mapping out your repeat region is by using `tools/suggest_unique_varcall-patterns.py` to look for short sequences of SVs as starting search patterns.  Once some candidate search patterns are found, place them into `tools/single-pattern_to_SValignment.py` to confirm that the reads agree with one another.  Once you are confident with a search pattern, use it as a 'seed' pattern for `tools/stepwise_varcall_assembler.py`.  This script works best for less homogenous regions (where local SVs are highly mixed).  You may want to refine the resulting `_patterns.tsv` file.  Likely, you will be able to manually find additional search patterns at the edges of the contig that it creates, perhaps joining it to other contigs.  Regardless, your final step should be to **visualize how your reads will be aligned** with one another by running `tools/locus-patterns_to_SValignment.py` on your `_patterns.tsv`. 
 
 ##### Run tagged_longread_assembler
-1. Copy the `perread_var_call` outputs, the `.feat` file and the `_oriented.fq` file, into the `tagged_longread_assembler` base directory.
+1. Copy the `perread_var_call` outputs - the `.feat` file and the `_oriented.fq` file - into the `tagged_longread_assembler` base directory.
 2. Place the names of these files into the appropriate field in the `config.yaml`
-3. Place your assembly map into a `_patterns.tsv` in `./loci_patterns/`.  Do this for each contig that you have.
-4. From the base directory, run the pipeline for each contig:
+3. Place your `_patterns.tsv` files into `./loci_patterns/`.  Do this for each contig that you have.
+4. From the base directory, run the pipeline for each contig.  For example:
 	```
 	snakemake -j 4 --use-conda final_contigs/YOURLOCI_contig.fa
 	```
@@ -38,8 +41,9 @@ Use `scripts/SV-kmer_simple_count.py` to look for unique loci (based on expected
 ### Pipeline Workflow
 Under construction
 
+
 ### Manual tag insertion (for use without `perread_var_call`)
-Preparing your input reads manually as fasta or fastq reads containing sequence tags is time consuming and requires careful work.  Essentially, this step is manually mapping out where each individual read segment should be assembled for the pipeline. This can be useful for unusual repeat regions that do not fit the assumptions used in `perread_var_call`. A GUI program for working with DNA sequence is practically necessary.  Geneious works very well, but free alternatives like Genome Compiler, Unipro UGENE, or Benchling's sequence tools could suffice.
+Preparing your input reads manually as fasta or fastq reads containing sequence tags is time consuming and requires careful work.  Essentially, this step is manually mapping out where each individual read segment should be assembled for the pipeline. This can be useful for unusual repeat regions that do not fit the assumptions used in `perread_var_call`. A GUI program for working with DNA sequence is practically necessary.  Geneious works very well, but free alternatives like Genome Compiler, Unipro UGENE, or Benchling's sequence tools might suffice.
 
 1\) The first step for creating an assembly is to find reads from the region.  To do this, define sequence or features that are unique to the region.  Reads containing such a feature can be retrieved by BLAST or minimap2 alignment to the unique sequence.
 >For example, a set of tandem repeats of the 45S ribosomal genes in *Arabidopsis thaliana* are bordered on one end by the At4g00005 protein coding gene.  Reads containing this junction are clearly unique to this locus not other 45S loci.  
