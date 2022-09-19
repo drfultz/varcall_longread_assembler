@@ -33,13 +33,22 @@ One way to start mapping out your repeat region is by using `tools/suggest_uniqu
 1. Copy the `perread_var_call` outputs - the `.feat` file and the `_oriented.fq` file - into the `tagged_longread_assembler` base directory.
 2. Place the names of these files into the appropriate field in the `config.yaml`
 3. Place your `_patterns.tsv` files into `./loci_patterns/`.  Do this for each contig that you have.
-4. From the base directory, run the pipeline for each contig.  For example:
+4. From the base directory, run the pipeline for each contig to generate a polished fasta for your contig.  For example:
 	```
 	snakemake -j 4 --use-conda final_contigs/YOURLOCI_contig.fa
 	```
-	
+
+### Working with pipeline outputs
+##### Details of search patterns and _patterns.tsv
+The 'search patterns' used to find unique sequences of SVs within .feat files are simply regular expression search patterns that will be fed into various python scripts using python's `re` module's functions and will search the unmodified text of the .feat files.  Thus, they should follow the rules of pythons `re` module regular expressions.  Search patterns can target every feature within every unit of a given SV sequence or could leave some features ambiguos.  To use a  DNA as an example, this would be the difference between searching for a 10 nucleotide pattern strictly "ATGAGTGCCC" or searching an partially ambiguous 10 nucleotide pattern "ATGNNNNCCC".
+
+The `_patterns.tsv` files should contain two lines.  The first line contains each search pattern for a locus/contig, in order, tab separated.  The second line contains the distances (in number of repeat units) between each search pattern, in order, tab separated.  Distances should be measured from the start of one pattern to the start of the next.  **NOTE** The distances in each column represent the distance from the given search pattern to the *previous* search pattern not to the next pattern.  The first pattern still needs an integer here.
+
+##### Visualizing `_SValign.tsv` files
+Several scripts (stepwise_varcall_assembler.py, locus-patterns_to_SValignment.py, etc.) generate tab-delimited files for use in visualizing the alignment and placement of SV called reads from .feat files.  These `_SValign.tsv` files are not particularly useful when viewed in a text editor, but if colored and zoomed out, are useful for validating search patterns.  The simplest way to color them is to create an Excel spreadsheet template with conditional rules that color cells based on their text, for example cells beginning with "A:VAR2" will be colored yellow.  Then, place the .tsv contents into this spreadsheet.  R scripts could also be made that would make a colored 'heatmap' from the .tsv files.
+
 ### Pipeline Workflow
-Under construction
+![Alt text](./images/workflow.svg)
 
 
 ### Manual tag insertion (for use without `perread_var_call`)
@@ -64,7 +73,7 @@ The order of the tags in the tag fasta file (from top to bottom) needs to match 
 - B) Use the '**Annotate from database**' tool to mark a relatively invariable region of your repeat on all of the reads (this annotation need not be long, 200bp works).  If possible, also annotate your unique feature(s) for clarity.
 
 - C) Copy and paste each tag into the appropriate region on the first read.  Place the tags precisely upstream of each target annotation by clicking on the annotation, then pressing left arrow key followed by right arrow key to position the cursor.  Press **CTRL+V** to paste.  Don't forget to save changes regularly.
-![Alt text](./cartoon.svg)
+![Alt text](./images/cartoon.svg)
 
 - D) Repeat step C) for every read.
 
