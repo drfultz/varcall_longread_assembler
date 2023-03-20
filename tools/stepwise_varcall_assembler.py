@@ -3,51 +3,30 @@ import sys
 import csv
 import re
 import itertools
+import tagged_longread_mod as mod
 
 ##### Starting from a seed pattern, attempt to find additional contiguous unique patterns
+##### Outputs a suggested patterns.tsv and an SV align
 
-if len(sys.argv)!=5:
-	print("\tERROR: please input a .feat file, an estimated coverage, a seed pattern, and a max window size")
+if len(sys.argv)!=6:
+	print("\tERROR: please input a .feat file, an estimated coverage, a seed pattern, a max window size, and whether to look for more patterns (default to minimal patterns, unless M as last positional argument).")
 	sys.exit(2)
 
 feat_file = sys.argv[1]
 est_cov = int(sys.argv[2])
 start_pattern = sys.argv[3]
 max_SVkmer_len = int(sys.argv[4])
+max_search = sys.argv[5]
 
-patterns_out = f"""{feat_file.split(".")[0]}_v3_patterns.tsv"""
-alignment_out = f"""{feat_file.split(".")[0]}_v3_SValign.tsv"""
+patterns_out = f"""{feat_file.split(".")[0]}_v4_patterns.tsv""" # give these unique names based on seed?
+alignment_out = f"""{feat_file.split(".")[0]}_v4_SValign.tsv"""
 
 ##### read in the feat file
 with open(feat_file, 'r') as feat_obj:
-	feat_fields = []
-	switch = False
-	for tsv_line in csv.reader(feat_obj, delimiter = "\t"):
+	feat_fields = mod.read_in_feat(feat_obj)
 
-		split_units = tsv_line[1].split(",")
-		trimmed_units = []
-		### loop through each unit
-		for u, unit in enumerate(split_units):
-			## if first or last unit
-			if u == 0 or u == (len(split_units)-1):
-				# keep unit if any call is not Unmapped
-				for subunit in unit.split("&"):
-					if subunit[-8:] != "Unmapped":
-						trimmed_units.append(unit)
-						break
-				# else: # no break
-				# 	print(f"all unmapped {u}")
-			## keep all internal units
-			else:
-				trimmed_units.append(unit)
-
-		# join trimmed units back together, ignore "^" markers on calls, and put into list
-		feat_fields.append(",".join(trimmed_units).replace("^",""))
-
-		# count number of features for first line
-		if switch == False:
-			num_features_present = len(tsv_line[1].split(",")[0].split("&"))
-			switch = True
+# count number of features for first line
+num_features_present = len(feat_fields[1].split(",")[0].split("&"))
 
 ##### Make distribution of unit length counts and normalize
 distribution = {}
@@ -65,60 +44,10 @@ for features in feat_fields:
 		num_wins += 1
 norm_factor = distribution[1] / est_cov
 
-def align_varcall_table(search_pattern, varcalls, num_feat, spacing):
-	### make varcall alignment
-	split_features = []
-	L_offset = 0
-	R_offset = 0
-
-	### gather any lines that match pattern
-	for line in varcalls:
-		## Find pattern by re.split
-		resplit_feature_entry = re.split(r'%s' % search_pattern, line)
-
-		## If pattern is found
-		if len(resplit_feature_entry) > 1:
-
-			## Find the number of units left of the pattern
-			L_units = resplit_feature_entry[0]
-			num_L_units = len(L_units.split(",")) - 1
-			## Keep track of the largest L_offset
-			if num_L_units > L_offset:
-				L_offset = num_L_units
-
-			## Find the number of units right of the pattern
-			R_units = resplit_feature_entry[1]
-			num_R_units = len(R_units.split(","))
-			## Keep track of the largest R_offset
-			if num_R_units > R_offset:
-				R_offset = num_R_units
-
-			## split the features entry into units and calls and put into lol
-			split_features.append([line.replace("&",",").split(","), num_L_units, num_R_units])
-
-	### calculate spacing offset for whole contig
-	extra_spacing = spacing - L_offset
-	if extra_spacing < 0:
-		extra_spacing = 0
-
-	### now that max offsets found, go back and add spaces to make all sublists equal length
-	aligned_features = []
-	for entry in split_features:
-		L_spaces = L_offset - entry[1]
-		for x in range((L_spaces+extra_spacing)*num_feat):
-			entry[0].insert(0, "-")
-
-		R_spaces = R_offset - entry[2]
-		for y in range(R_spaces*num_feat):
-			entry[0].append("-")
-
-		aligned_features.append(entry[0])
-
-	return aligned_features
 
 def make_varcall_consensus(search_pattern1, varcalls1, num_feat1):
 	### align current pattern
-	current_table = align_varcall_table(search_pattern1, varcalls1, num_feat1, 0)
+	current_table = mod.align_varcall_table(search_pattern1, varcalls1, num_feat1, 0)
 	tp_current_table = list(map(list, zip(*current_table)))
 
 	### evaluate and make consensus
@@ -185,6 +114,43 @@ def make_varcall_consensus(search_pattern1, varcalls1, num_feat1):
 
 	return cons_string, good_columns
 
+def test_cov():
+	## make string
+	pre_re_string = r""
+	pre_re_string += ",".join(current_win)
+
+	## using lookahead with internal capture to not consume overlapping matches
+	re_string = r"(?=(" + pre_re_string + r"))"
+	#print(re_string)
+
+	## count occurences
+	count = 0
+	for feat_field in feat_fields:
+		count += len(re.findall(re_string, feat_field))
+
+	## if expected coverage found
+	current_exp_cov = distribution[len(current_win)] / norm_factor
+	if 0.7*current_exp_cov <= count <= 1.3*current_exp_cov:
+		## and aligment is good
+		new_cons_string, current_good = make_varcall_consensus(pre_re_string, feat_fields, num_features_present)
+		if current_good == True:
+
+			## determine outputs based on direction
+			if F == True:
+				relative_spacing = resplit_cons[1].count(",") + len(half_set) - w - 1 - size
+				patterns_line.append(pre_re_string)
+				spacing_line.append(str(relative_spacing))
+			else:
+				relative_spacing = len(half_set) - w - 1
+				patterns_line.insert(0, pre_re_string)
+				spacing_line[0] = str(relative_spacing)
+				spacing_line.insert(0, "50")
+
+			print(f"{pre_re_string}\t{relative_spacing}\t{current_exp_cov}\t{count}")
+			return new_cons_string, pre_re_string, True
+	#if True is not returned first
+	return current_cons_string, current_pattern, False
+
 ##### align patterns and find new ones until can't find unique pattern or consensus is ambiguous
 ### align and test start pattern
 start_cons_string, good_start = make_varcall_consensus(start_pattern, feat_fields, num_features_present)
@@ -192,7 +158,7 @@ start_cons_string, good_start = make_varcall_consensus(start_pattern, feat_field
 if good_start == False:
 	### write the alignment for troubleshooting
 	with open(alignment_out, 'w') as alignment_obj:
-		for out_line in align_varcall_table(start_pattern, feat_fields, num_features_present, 0):
+		for out_line in mod.align_varcall_table(start_pattern, feat_fields, num_features_present, 0):
 			alignment_obj.write("\t".join(out_line) + "\n")
 
 	### end script
@@ -223,72 +189,70 @@ for F in [True,False]:
 
 		## setup for search based on direction
 		## take the appropriate half of resplit string, split into list at "," and replace double dashes
-		if F is True:
+		if F == True:
 			half_set = [s_unit.replace("--","[^,]+") for s_unit in resplit_cons[2].split(",")]
 		else:
 			half_set = [s_unit.replace("--","[^,]+") for s_unit in resplit_cons[0].split(",")]
 
-		### Greedy search for next pattern
-		## loop sizes first
-		for size in range(1,max_SVkmer_len+1):
-			## loop through number of windows available for this size
-			for w in range(len(half_set[size:])):
+		### if maximum pattern searching
+		if max_search == "M":
+			## loop sizes first
+			for size in range(1,max_SVkmer_len+1):
+				## loop through number of windows available for this size, starting with closest
+				for w in reversed(range(len(half_set[size:]))):
 
-				## define window to examine based on direction
-				if F is True:
-					print(f"{-w-size-1}\t{-w-1}")
-					current_win = half_set[(-w-size-1):(-w-1)]
-				else:
-					print(f"{w}\t{w+size}")
-					current_win = half_set[w:(w+size)]
+					## define window to examine based on direction
+					if F == True:
+						print(f"{-w-size-1}\t{-w-1}")
+						current_win = half_set[(-w-size-1):(-w-1)]
+					else:
+						print(f"{w}\t{w+size}")
+						current_win = half_set[w:(w+size)]
 
-				## make string
-				pre_re_string = r""
-				pre_re_string += ",".join(current_win)
+					current_cons_string, current_pattern, cov_good = test_cov()
 
-				## using lookahead with internal capture to not consume overlapping matches
-				re_string = r"(?=(" + pre_re_string + r"))"
-				#print(re_string)
-
-				## count occurences
-				count = 0
-				for feat_field in feat_fields:
-					count += len(re.findall(re_string, feat_field))
-
-				## if expected coverage found
-				current_exp_cov = distribution[len(current_win)] / norm_factor
-				if 0.7*current_exp_cov <= count <= 1.3*current_exp_cov:
-					## and aligment is good
-					new_cons_string, current_good = make_varcall_consensus(pre_re_string, feat_fields, num_features_present)
-					if current_good is True:
-
-						## set as next pattern
-						current_cons_string = new_cons_string
-						current_pattern = pre_re_string
-
-						## determine outputs based on direction
-						if F is True:
-							relative_spacing = resplit_cons[1].count(",") + len(half_set) - w - 1 - size
-							patterns_line.append(current_pattern)
-							spacing_line.append(str(relative_spacing))
-						else:
-							relative_spacing = len(half_set) - w - 1
-							patterns_line.insert(0, current_pattern)
-							spacing_line[0] = str(relative_spacing)
-							spacing_line.insert(0, "50")
-
-						print(f"{current_pattern}\t{relative_spacing}\t{current_exp_cov}\t{count}")
+					if cov_good == True:
 						break
 
-			else: ## no break at this size
-				## Continue the outer loop
-				continue
-			## inner loop was broken, break the outer.
-			break
+				else: ## no break at this size
+					## Continue the outer loop
+					continue
+				## inner loop was broken, break the outer.
+				break
 
-		else: ## no break in finding new pattern, end search in this direction
-			contiguous = False
+			else: ## no break in finding new pattern, end search in this direction
+				contiguous = False #so that while loop stops
 
+		### default to greedy search if not doing max search
+		else:
+			## loop sizes first
+			for size in range(1,max_SVkmer_len+1):
+				## loop through number of windows available for this size
+				for w in range(len(half_set[size:])):
+
+					## define window to examine based on direction
+					if F == True:
+						print(f"{-w-size-1}\t{-w-1}")
+						current_win = half_set[(-w-size-1):(-w-1)]
+					else:
+						print(f"{w}\t{w+size}")
+						current_win = half_set[w:(w+size)]
+
+					current_cons_string, current_pattern, cov_good = test_cov()
+
+					if cov_good == True:
+						break
+
+				else: ## no break at this size
+					## Continue the outer loop
+					continue
+				## inner loop was broken, break the outer.
+				break
+
+			else: ## no break in finding new pattern, end search in this direction
+				contiguous = False #so that while loop stops
+
+print(spacing_line)
 ##### Output patterns file
 with open(patterns_out, 'w') as patterns_obj:
 	patterns_obj.write("\t".join(patterns_line) + "\n")
@@ -300,108 +264,5 @@ with open(alignment_out, 'w') as alignment_obj:
 	for pattern,rel_spacing in zip(patterns_line,spacing_line):
 		abs_spacing += int(rel_spacing)
 		alignment_obj.write("\t"*abs_spacing*num_features_present + pattern + "\n")
-		for out_line in align_varcall_table(pattern, feat_fields, num_features_present, abs_spacing):
+		for out_line in mod.align_varcall_table(pattern, feat_fields, num_features_present, abs_spacing):
 			alignment_obj.write("\t".join(out_line) + "\n")
-
-
-# #####
-# # intially set current as filtered set and real as empty
-# current_combos = filt_combos
-# real_combos = [[]]
-# ### for each length up to max length
-# for size in range(1,max_SVkmer_len+1):
-
-# 	### set values
-# 	working_combos = []
-# 	exp_cov = distribution[size] / norm_factor
-# 	low_cov = 0.7*exp_cov
-# 	high_cov = 1.3*exp_cov
-
-# 	print(f"\nsize {size}\t exp {exp_cov}")
-
-# 	### Look for multi unit combo that is in expected range
-# 	##loop through existing multi combos
-# 	for seed_combo in current_combos:
-# 		##loop through combos to add
-# 		for add_combo in real_combos:
-# 			## add combo to seed
-# 			multi_combo = seed_combo + add_combo
-
-# 			## make string
-# 			pre_re_string = r""
-# 			pre_re_string += "[^,]*,[^,]*".join(multi_combo)
-
-# 			## using lookahead with internal capture to not consume overlapping matches, I think?
-# 			re_string = r"(?=(" + pre_re_string + r"))"
-# 			#print(re_string)
-
-# 			## count occurences
-# 			count = 0
-# 			for feat_field in feat_fields:
-# 				count += len(re.findall(re_string, feat_field))
-
-# 			### if real
-# 			if count > low_cov:
-# 				## if within unique pattern range
-# 				if count < high_cov:
-# 					print("\n" + pre_re_string + "\t" + str(count))
-
-# 					### run function
-# 					aligned_table = align_varcall_table(pre_re_string,feat_fields)
-# 					tp_aligned_table = list(map(list, zip(*aligned_table)))
-
-# 					### evaluate and make consensus
-# 					## for column in original table (using transposed table)
-# 					consensus_calls = []
-# 					for col in tp_aligned_table:
-# 						col_total = 0
-# 						calls = {}
-# 						## go through each field to tally calls present
-# 						for field in col:
-# 							## if not a -
-# 							if field != "-":
-# 								## add to total
-# 								col_total += 1
-
-# 								## count occurences of every call
-# 								if field in calls:
-# 									calls[field] += 1
-# 								else:
-# 									calls[field] = 1
-
-# 						## test col for matching
-# 						if col_total >= 4:
-# 							highest_count = 0
-# 							for call in calls:
-# 								if calls[call] > highest_count:
-# 									consensus_call = call
-# 									highest_count = calls[call]
-# 						else:
-# 							consensus_call = "-"
-# 						consensus_calls.append(consensus_call)
-
-# 						## tally mismatches
-# 						mismatches = 0
-# 						for field in col:
-# 							if field != "-" and field[-8:] != "Unmapped":
-# 								if field != consensus_call:
-# 									mismatches += 1
-
-
-# 					# if table is properly matching
-# 					#if threshold:
-# 					# for aligned_line in aligned_table:
-# 					# 	print("\t".join(aligned_line))
-
-# 					print("\t".join(consensus_calls))
-
-# 				## else include in real combos for further use
-# 				else:
-# 					working_combos.append(multi_combo)
-# 					#print("added for next round")
-
-# 	### write over initial combo set with smaller passing set
-# 	print(working_combos)
-# 	if size == 1:
-# 		real_combos = working_combos
-# 	current_combos = working_combos
