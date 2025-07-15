@@ -1,4 +1,4 @@
-localrules: insert_tags, fq_to_fa, tagged_read_splitter, cons_calls, merge_cons, remove_tags
+localrules: draft_remove_tags, insert_tags, fq_to_fa, tagged_read_splitter, cons_calls, merge_cons, remove_tags
 
 configfile: "config.yaml"
 
@@ -142,6 +142,16 @@ rule remove_tags:
     script:
         "scripts/remove_tags_sm.py"
 
+rule draft_remove_tags:
+    input:
+        config["Tag_set"],
+        "merge_cons/{contig}_merge.fa"
+    output:
+        "draft_contigs/{contig}_draft-contig.fa"
+    conda:
+        "envs/pysam.yaml"
+    script:
+        "scripts/remove_tags_sm.py"
 
 
 
