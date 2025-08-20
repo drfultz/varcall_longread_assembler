@@ -5,7 +5,7 @@ import re
 
 
 def read_in_feat(file_obj):
-	##### read in a feat file parsed into a list, removing empty units at either end and "^" marks
+	##### read in a feat file (variant calls only), parsed into a list of strings, removing empty units at either end and "^" marks
 	feats = []
 	for tsv_line in csv.reader(file_obj, delimiter = "\t"):
 
@@ -28,6 +28,31 @@ def read_in_feat(file_obj):
 
 		# join trimmed units back together, ignore "^" markers on calls, and put into list
 		feats.append(",".join(trimmed_units).replace("^",""))
+
+	return feats
+
+def read_in_feat_aslol(file_obj):
+	##### read in a feat file (variant calls only), parsed into a list of lists, removing empty units at either end and "^" marks
+	feats = []
+	for tsv_line in csv.reader(file_obj, delimiter = "\t"):
+
+		split_units = tsv_line[1].split(",")
+		trimmed_units = []
+		### loop through each unit
+		for u, unit in enumerate(split_units):
+			## if first or last unit
+			if u == 0 or u == (len(split_units)-1):
+				# keep unit if any call is not Unmapped
+				for subunit in unit.split("&"):
+					if subunit[-8:] != "Unmapped":
+						trimmed_units.append(unit.replace("^",""))
+						break
+			## keep all internal units
+			else:
+				trimmed_units.append(unit.replace("^",""))
+
+		# put trimmed_units lists into list
+		feats.append(trimmed_units)
 
 	return feats
 

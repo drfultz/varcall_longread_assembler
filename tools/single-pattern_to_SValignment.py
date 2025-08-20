@@ -2,6 +2,9 @@
 import sys
 import re
 
+##### Using a regular expression string from command line, align matching reads from a .feat file at this point.
+##### Outputs a SValign.tsv that can be visualized with Excel.
+
 if len(sys.argv)!=4:
 	print("\tERROR: please input a .feat file, a regular expression search string, and how many features for scaffold reads")
 	sys.exit(2)
@@ -93,11 +96,12 @@ for entry in features_parsed:
 	print(f"{entry[0]}\t{L_spaced_entries}\t{features_string}{R_spaced_entries}")
 
 	## Find two reads that stretch the most 5' to pattern
-	#if number of L_spaces is 0, read is a longest read but only set as first entry if there isn't one already
+	#if number of L_spaces is 0 (should always be at least one), read is a longest read but only set as first entry if there isn't one already
 	if L_spaces == 0 and longest_found == False:
 		trimmed_longest = trim_entry()
 		longest_found = True
 
+	#finds a second longest read (can find a second L_spaces == 0)
 	elif L_spaces < longest_length:
 		longest_length = L_spaces
 		trimmed_longest2 = trim_entry()

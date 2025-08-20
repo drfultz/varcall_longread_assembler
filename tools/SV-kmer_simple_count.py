@@ -6,10 +6,11 @@ import itertools
 
 ###Takes a .feat file and counts the number of occurences of SV sequence 'kmers' using
 ###only SVs defined in the second input, at a single length of SV kmer defined by third input.
+###Does an exhaustive search of all possible combinations, which is slow.
 ###Can be used on long read .feat files and assembly .feat files.
 
 if len(sys.argv)!=4:
-	print("\tERROR: please input a .feat file, a file with target SVs, and the length of SV kmers")
+	print("\tERROR: please input a .feat file, a file with target SVs, and the length of SV kmers",file=sys. stderr)
 	sys.exit(2)
 
 feat_file = sys.argv[1]

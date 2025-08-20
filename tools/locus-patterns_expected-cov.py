@@ -53,7 +53,7 @@ for pattern in patterns:
 		## Add 1 for each occurence of the pattern in the line (multiple occurences count more than once)
 		count += len(resplit_feature_entry) - 1
 
-	pat_len = pattern.count("+,") + len(re.findall("\w,", pattern)) + 1
+	pat_len = pattern.count("+,") + len(re.findall(r'\w,', pattern)) + 1
 	norm_FC = math.log2((count + 0.0000001)/ (distribution[pat_len] / norm_factor))
 
 	print(f"{pattern}\t{count}\t{norm_FC}")

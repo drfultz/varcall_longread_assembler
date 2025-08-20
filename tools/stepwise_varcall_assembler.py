@@ -155,14 +155,14 @@ def test_cov():
 ### align and test start pattern
 start_cons_string, good_start = make_varcall_consensus(start_pattern, feat_fields, num_features_present)
 
-if good_start == False:
-	### write the alignment for troubleshooting
-	with open(alignment_out, 'w') as alignment_obj:
-		for out_line in mod.align_varcall_table(start_pattern, feat_fields, num_features_present, 0):
-			alignment_obj.write("\t".join(out_line) + "\n")
-
-	### end script
-	raise Exception("\nInitial pattern contains mismatching variant calls.\n")
+#if good_start == False:
+#	### write the alignment for troubleshooting
+#	with open(alignment_out, 'w') as alignment_obj:
+#		for out_line in mod.align_varcall_table(start_pattern, feat_fields, num_features_present, 0):
+#			alignment_obj.write("\t".join(out_line) + "\n")
+#
+#	### end script
+#	raise Exception("\nInitial pattern contains mismatching variant calls.\n")
 
 ### setup
 patterns_line = [start_pattern]
