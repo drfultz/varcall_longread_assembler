@@ -1,3 +1,5 @@
 Feature-calls_file: test.feat # replace test.feat with your .feat file
-Oriented_fastq_file: test.fq # replace test.fq with your _oriented.fq filt
-Tag_set: tags/1500_5kb_tags.fa
+Oriented_fastq_file: test_oriented.fq # replace test.fq with your _oriented.fq filt
+
+Max_depth: 50 #If a unit's read depth is above this number, only the highest quality read segments up to this number will be used
+Segment_q_cutoff: 10 # discard read segments below this mean PHRED score, unless this reduces coverage below 5

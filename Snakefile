@@ -1,49 +1,34 @@
-localrules: draft_remove_tags, insert_tags, fq_to_fa, tagged_read_splitter, cons_calls, merge_cons, remove_tags
+localrules: read_splitter, cons_calls, merge_cons
 
 configfile: "config.yaml"
 
-rule insert_tags:
+wildcard_constraints:
+    contig=r"[^/]+",
+    seg_num=r"\d+"
+
+##### Main Assembly Pipeline
+#####
+
+#Python script finds matching anchors in feature calls then uses this to
+#bin the DNA sequence segments into the appropriate multi-fasta for that repeat unit
+checkpoint read_splitter:
     input:
         config["Feature-calls_file"],
         config["Oriented_fastq_file"],
-        "loci_patterns/{contig}_patterns.tsv",
-        config["Tag_set"]
+        "loci_anchors/{contig}_anchors.tsv"
     output:
-        "used_readnames/{contig}_usedreadnames.txt",
-        "tagged_reads/{contig}_tagreads.fq"
-    conda:
-        "envs/pysam.yaml"
-    script:
-        "scripts/insert_tags_multi_sm.py"
-
-rule fq_to_fa:
-    input:
-        "tagged_reads/{contig}_tagreads.fq"
-    output:
-        "tagged_reads/{contig}_tagreads.fa"
+        "split_read_info/{contig}_read_info.tsv",
+        directory("segment_reads/{contig}"),
+        "metadata/{contig}_metadata.tsv"
     params:
-        ppn="1",
-        vmem="8gb",
-        walltime="1:00:00"
-    conda:
-        "envs/bbmap2.yaml"
-    shell:
-        "reformat.sh qin=33 in={input[0]} out={output[0]}"
-
-#python script searches reads for sequence in between 'sequence tags',
-#then bins the sub-sequences into the appropriate multi-fasta for that tag set
-checkpoint tagged_read_splitter:
-    input:
-        config["Tag_set"],
-        "tagged_reads/{contig}_tagreads.fa"
-    output:
-        directory("segment_reads/{contig}")
+        Segment_q_cutoff=config["Segment_q_cutoff"],
+        Max_depth=config["Max_depth"]
     conda:
         "envs/pysam.yaml"
     script:
-        "scripts/tagged_read_splitter_sm.py"
+        "scripts/split_reads_into_units_sm.py"
 
-#kalign2 makes an MSA of each multi-fasta of reads from a given segment
+#kalign2 makes an MSA of each multi-fasta of segment reads from a given unit
 rule kalign2:
     input:
         "segment_reads/{contig}/seg_{seg_num}_reads.fa"
@@ -51,12 +36,12 @@ rule kalign2:
         "MSA_align/{contig}_seg_{seg_num}.aln"
     params:
         ppn="1",
-        vmem="10gb",
+        mem_per_cpu="10gb",
         walltime="24:00:00"
     conda:
         "envs/kalign2.yaml"
     shell: 
-        "kalign -gpo 60 -gpe 9 -tgpe 0 -bonus 0 {input} > {output[0]} \n"
+        "kalign -gpo 60 -gpe 9 -tgpe 0 -bonus 0 {input} > {output[0]}"
 
 #EMBOSS cons makes a consensus of each MSA, followed by removal of 'N' nucleotides
 #Default cons settings followed by removal of N is most accurate and
@@ -69,106 +54,23 @@ rule cons_calls:
     conda:
         "envs/cons.yaml"
     shell:
-        """cons -name {wildcards.contig}_{wildcards.seg_num}_cons -sequence {input[0]} -filter | awk 'NR<2 {{print}} NR>1 {{gsub("[nN]",""); print}}' > {output[0]}"""
-        #"""cons -name {wildcards.contig}_{wildcards.seg_num}_cons -sequence {input[0]} -filter > {output[0]}"""
-        #"cons -name {wildcards.contig}_{wildcards.seg_num}_cons -identity 3 -plurality 0.5 -sequence {input[0]} -filter | tr -d 'N' > {output[0]}"  #!!! using tr here will lose 'N's in fa header.
+        """cons -name {wildcards.contig}_{wildcards.seg_num}_cons -sequence {input[0]} -filter | awk 'NR==1 {{print}} NR>1 {{gsub("[nN]",""); seq=seq $0}} END {{print seq}}' > {output[0]}"""
 
 #Checkpoint function to reevaluate DAG for converging from multiple segments
 #back into a single consensus
 def merge_cons_input(wildcards):
-    checkpoint_output = checkpoints.tagged_read_splitter.get(contig=wildcards.contig).output[0]
-    return expand("consensus/{contig}_seg_{seg_num}_cons.fa", contig=wildcards.contig, seg_num=glob_wildcards(os.path.join(checkpoint_output, "seg_{seg_num}_reads.fa")).seg_num)
+    seg_dir = checkpoints.read_splitter.get(contig=wildcards.contig).output[1] 
+    seg_nums = glob_wildcards(os.path.join(seg_dir, r"seg_{seg_num,\d+}_reads.fa")).seg_num
+    return expand("consensus/{contig}_seg_{seg_num}_cons.fa", contig=wildcards.contig, seg_num=sorted(seg_nums, key=int))
 
-#use echo to write a new fasta header
-#then append a single line made from the merged input file sequence lines and
-#after removing tandem 'sequence tag' duplications via python script
+# pastes the consensus sequence together in order
 rule merge_cons:
     input:
-        cons=merge_cons_input,
-        tag_fa=config["Tag_set"]
+        cons=merge_cons_input
     output:
-        "merge_cons/{contig}_merge.fa"
+        "contig_sequence/{contig}_contig.fa"
     conda:
         "envs/pysam.yaml"
     script:
         "scripts/merge_cons_sm.py"
-        
-#polishing of the draft consensus via minimap2 and racon
-#draft and reads still contain tags to ensure alignment at proper locations
-rule minimap2_racon:
-    input:
-        "merge_cons/{contig}_merge.fa",
-        "tagged_reads/{contig}_tagreads.fa"
-    output:
-        "mappings_polish/{contig}_to_raw.sam",
-        "polished/{contig}_polished1X.fa"
-    params:
-        ppn="4",
-        vmem="12gb",
-        walltime="20:00:00"
-    conda:
-        "envs/minimap2_racon.yaml"
-    shell:
-        "minimap2 -a -L --secondary=no -t {params.ppn} -x map-ont {input[0]} {input[1]} | samtools view -h -F 2304 - > {output[0]} \n"
-        "racon -t {params.ppn} {input[1]} {output[0]} {input[0]} > {output[1]} \n"
 
-#second round of polishing. Final output still contains tags.
-#Visualization of resulting alignments is important to verify proper polishing
-rule minimap2_racon2:
-    input:
-        "polished/{contig}_polished1X.fa",
-        "tagged_reads/{contig}_tagreads.fa"
-    output:
-        "mappings_polish/{contig}_to_1X.sam",
-        "polished/{contig}_polished2X.fa"
-    params:
-        ppn="4",
-        vmem="12gb",
-        walltime="20:00:00"
-    conda:
-        "envs/minimap2_racon.yaml"
-    shell:
-        "minimap2 -a -L --secondary=no -t {params.ppn} -x map-ont {input[0]} {input[1]} | samtools view -h -F 2304 - > {output[0]} \n"
-        "racon -t {params.ppn} {input[1]} {output[0]} {input[0]} > {output[1]} \n"
-
-rule remove_tags:
-    input:
-        config["Tag_set"],
-        "polished/{contig}_polished2X.fa"
-    output:
-        "final_contigs/{contig}_contig.fa"
-    conda:
-        "envs/pysam.yaml"
-    script:
-        "scripts/remove_tags_sm.py"
-
-rule draft_remove_tags:
-    input:
-        config["Tag_set"],
-        "merge_cons/{contig}_merge.fa"
-    output:
-        "draft_contigs/{contig}_draft-contig.fa"
-    conda:
-        "envs/pysam.yaml"
-    script:
-        "scripts/remove_tags_sm.py"
-
-
-
-
-#not currently used
-rule sizeselect_reads:
-    input:
-        "",
-        ""
-    output:
-        "reads_sized/{contig}_sizedreads.fq"
-    params:
-        ppn="1",
-        vmem="8gb",
-        walltime="2:00:00"
-    shell:
-        "MEAN=$(awk 'NR % 2 == 0 {{sum+=length}} END {{ print sum / NR * 2 }}' {input[0]} ) \n"
-        "let LOWER=MEAN*9/10 \n"
-        "let UPPER=MEAN*11/10 \n"
-        "awk 'BEGIN {{OFS = \"\\n\"}} {{header = $0 ; getline seq ; getline qheader ; getline qseq ; if (length(seq) >= '$LOWER' && length(seq) <= '$UPPER') {{print header, seq, qheader, qseq}}}}' < {input[1]} > {output}"
