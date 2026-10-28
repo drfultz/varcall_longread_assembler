@@ -1,0 +1,9 @@
+.snakemake/
+split_read_info/
+segment_reads/
+metadata/
+MSA_align/
+consensus/
+contig_sequence/
+logs/*
+!logs/.temp

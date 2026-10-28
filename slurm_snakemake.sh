@@ -5,16 +5,16 @@
 #SBATCH -e sm_master_%j.err
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=d@iu.edu
-#SBATCH -D /N/slate/d/tagged_longread_assembler
+#SBATCH -D /N/varcall_longread_assembler
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
 #SBATCH --mem-per-cpu=8G
 #SBATCH --time=36:00:00
 
-TARGET=final_contigs/test-tel_contig.fa
+TARGET=contig_sequence/test-tel_contig.fa
 
-source ~/.bashrc
+module load miniconda
 conda activate snakemake
 
 snakemake --cluster 'sbatch \
@@ -27,6 +27,6 @@ snakemake --cluster 'sbatch \
 --nodes=1 \
 --ntasks=1 \
 --cpus-per-task={params.ppn} \
---mem-per-cpu={params.vmem} \
+--mem-per-cpu={params.mem_per_cpu} \
 --time={params.walltime} \
 ' --jobs 100 --local-cores 1 --use-conda $TARGET
