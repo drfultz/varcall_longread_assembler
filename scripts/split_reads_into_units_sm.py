@@ -110,7 +110,14 @@ with open(features_file, 'r') as feature_file_obj, open(read_info_file, 'w') as 
 		num_units = len(cur_featcalls.split(","))
 		feature_starts = feature_line[2].split(",")
 		feature_starts.append(len(fastq_entry.sequence))
-		read_dir = '+'
+
+		orientation = fastq_entry.comment
+		if orientation == "F":
+			read_dir = "+"
+		elif orientation == "RC":
+			read_dir = "-"
+		else:
+			raise ValueError(f"read {cur_readname}: expected comment F or RC in oriented fastq, got {fastq_entry.comment!r}")			
 
 		## Write read info
 		feature_starts_string = ",".join([str(x) for x in feature_starts])
@@ -163,10 +170,12 @@ if not fastq_seq_dict:
 
 def length_filter(seg_reads, seg_lengths, unit_label):
 	"""For units deeper than 4, keep reads within 0.67-1.5x the median length. If 2 or fewer survive,
-	return all reads unfiltered."""
+	return reads longer than 14."""
+	
+	# return all reads above trivially small
 	if len(seg_reads) <= 4:
-		# return all reads
-		return seg_reads
+		kept = [r for r, L in zip(seg_reads, seg_lengths) if L >= 15]
+		return kept
 
 	### Calculate the median length and keep reads that are close
 	median_len = statistics.median(seg_lengths)
@@ -176,10 +185,11 @@ def length_filter(seg_reads, seg_lengths, unit_label):
 		# return filtered reads
 		return kept
 	else:
-		# Note high variability and return all
+		# Note high variability and return all above trivially small
 		print(f"\nThe segment reads at unit number {unit_label} were frequently dissimilar to the median length"
 			  f" of {median_len}.\nsegment lengths: {seg_lengths}")
-		return seg_reads
+		kept = [r for r, L in zip(seg_reads, seg_lengths) if L >= 15]
+		return kept
 
 def quality_filter(seg_reads, q_cutoff, max_depth):
 	"""Keep reads with arithmetic mean Phred > q_cutoff and at most max_depth best scoring reads.
@@ -196,7 +206,7 @@ def quality_filter(seg_reads, q_cutoff, max_depth):
 		passing.sort(key=lambda x: x[0], reverse=True)
 		# return max depth best reads
 		return [read for _, read in passing[:max_depth]], len(passing)
-	elif len(passing) > 4:
+	elif len(passing) >= 5:
 		# return all q filtered reads
 		return [read for _, read in passing], len(passing)
 	else:
@@ -224,6 +234,9 @@ for unit_int in range(first_unit, last_unit + 1):
 		
 		### Filter by length
 		temp_seg_reads = length_filter(unit_seg_reads, unit_lengths, unit_num)
+		if not temp_seg_reads:
+			raise ValueError(f"No reads above 15bp minimum filter for unit {unit_label}. "
+				f"Segment lengths: {seg_lengths}")
 
 		### Filter by quality
 		final_seg_reads, n_qfilt = quality_filter(temp_seg_reads, q_cutoff, max_depth)

@@ -4,7 +4,10 @@ import csv
 import re
 import itertools
 
-#####
+##### Finds unique patterns based on expected coverage.
+##### Takes too long and finds too many redundant patterns to use for large assemblies,
+##### but may be useful for targeting specific regions with the target SVs file
+##### only using a subset present within that region.
 
 if len(sys.argv)!=5:
 	print("\tERROR: please input a .feat file, a file with target SVs, an estimated coverage, and a max window size")
@@ -30,8 +33,8 @@ with open(target_SVs_file, 'r') as target_SVs_obj:
 with open(feat_file, 'r') as feat_obj:
 	feat_fields = []
 	for line in csv.reader(feat_obj, delimiter = "\t"):
-		# ignore "^" markers on calls
-		feat_fields.append(line[1].replace("^",""))
+		# ignore "%" markers on calls
+		feat_fields.append(line[1].replace("%",""))
 
 ##### Make distribution of unit length counts and normalize
 distribution = {}

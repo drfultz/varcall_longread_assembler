@@ -72,3 +72,14 @@ Several tools (`stepwise_varcall_assembler.py`, `locus-patterns_to_SValignment.p
 
 ### Other tools
 Several other scripts are included in the `tools` folder, but are not documented as they are draft versions.
+
+## DNA modification in repeat assemblies
+Long read technologies can generate data about modified DNA bases during sequencing.  While standard long read tools (such as minimap2 or winnowmap) can be used to map long reads to repetitive regions in order to analyze this data, these methods may not perfectly discriminate read placement in regions with the most identical repeats.  However, precise read placement is built into this pipeline.  Thus, I have extended the pipeline with optional steps for DNA modification analysis on the assembled contigs.
+
+This additional analysis was designed for use with long ONT reads.  These steps use the coordinates in the `.feat` file to segment corresponding reads from the unaligned BAM and then use the read placements from the assembly steps to assign each segment to its unit. ONT's dorado aligner command maps these reads to their consensus and modkit summarizes the modification data, which is then merged back into one output per contig.
+
+In the `config.yaml`, the user provides the unaligned BAM from an ONT basecaller, such as dorado, that contains base modification information. (However, these steps may work with any unaligned BAM with similarly formatted modification tags.)  Because coordinates to split the BAM reads come from the `.feat` file, the BAM read length must match the fastq read length. Thus, the unaligned BAM reads MUST come from the same basecalling run as the fastq reads that were placed into `perread_var_call`, and fastq reads that were trimmed or altered after basecalling will be skipped. Further, the user must also specify the flags to use for modkit in the `config.yaml`.  Finally, run
+```
+snakemake -j 4 --use-conda modkit_merged/YOURLOCI_merged.bed
+```
+The resulting bed file is a standard bedMethyl file with coordinates on the full contig, so it can be used downstream just like one produced by aligning whole reads to the contig.

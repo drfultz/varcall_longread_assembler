@@ -1,0 +1,8 @@
+channels:
+ - bioconda
+ - hcc
+ - conda-forge
+ - nodefaults
+dependencies:
+ - dorado
+ - samtools

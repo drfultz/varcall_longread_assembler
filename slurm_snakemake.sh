@@ -4,7 +4,7 @@
 #SBATCH -o sm_master_%j.out
 #SBATCH -e sm_master_%j.err
 #SBATCH --mail-type=ALL
-#SBATCH --mail-user=d@iu.edu
+#SBATCH --mail-user=YOUR_EMAIL@domain.edu
 #SBATCH -D /N/varcall_longread_assembler
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
@@ -20,10 +20,10 @@ conda activate snakemake
 snakemake --cluster 'sbatch \
 -J sm_sub \
 -p general \
--o logs/{wildcards.contig}_{rule}_${{SLURM_JOBID}}.out \
--e logs/{wildcards.contig}_{rule}_${{SLURM_JOBID}}.err \
+-o logs/{wildcards.contig}_{rule}_%j.out \
+-e logs/{wildcards.contig}_{rule}_%j.err \
 --mail-type=ALL \
---mail-user=d@iu.edu \
+--mail-user=YOUR_EMAIL@domain.edu \
 --nodes=1 \
 --ntasks=1 \
 --cpus-per-task={params.ppn} \

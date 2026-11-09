@@ -18,8 +18,8 @@ start_pattern = sys.argv[3]
 max_SVkmer_len = int(sys.argv[4])
 max_search = sys.argv[5]
 
-patterns_out = f"""{feat_file.split(".")[0]}_v4_patterns.tsv""" # give these unique names based on seed?
-alignment_out = f"""{feat_file.split(".")[0]}_v4_SValign.tsv"""
+patterns_out = f"""{feat_file.split(".")[0]}_draft_anchors.tsv""" # give these unique names based on seed?
+alignment_out = f"""{feat_file.split(".")[0]}_draft_SValign.tsv"""
 
 ##### read in the feat file
 with open(feat_file, 'r') as feat_obj:

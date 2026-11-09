@@ -3,3 +3,6 @@ Oriented_fastq_file: test_oriented.fq # replace test_oriented.fq with your _orie
 
 Max_depth: 50 #If a unit's read depth is above this number, only the highest quality read segments up to this number will be used
 Segment_q_cutoff: 10 # discard read segments below this mean PHRED score, unless this reduces coverage below 5
+
+Bam_reads_file: Sha_NOR2-cent_reads_35kbp.bam
+Modkit_flags: "--modified-bases 5mC --motif CG 0 --motif CHG 0 --motif CHH 0"
