@@ -235,8 +235,8 @@ for unit_int in range(first_unit, last_unit + 1):
 		### Filter by length
 		temp_seg_reads = length_filter(unit_seg_reads, unit_lengths, unit_num)
 		if not temp_seg_reads:
-			raise ValueError(f"No reads above 15bp minimum filter for unit {unit_label}. "
-				f"Segment lengths: {seg_lengths}")
+			raise ValueError(f"No reads above 15bp minimum filter for unit {unit_num}. "
+				f"Segment lengths: {unit_lengths}")
 
 		### Filter by quality
 		final_seg_reads, n_qfilt = quality_filter(temp_seg_reads, q_cutoff, max_depth)
