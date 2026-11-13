@@ -1,4 +1,4 @@
-Feature-calls_file: test.feat # replace test.feat with your .feat file
+Feature_calls_file: test.feat # replace test.feat with your .feat file
 Oriented_fastq_file: test_oriented.fq # replace test_oriented.fq with your _oriented.fq filt
 
 Max_depth: 50 #If a unit's read depth is above this number, only the highest quality read segments up to this number will be used
