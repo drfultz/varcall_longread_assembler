@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 import sys
-import csv
 import re
+import os
 import itertools
+import hashlib
 import tagged_longread_mod as mod
 
-##### Starting from a seed pattern, attempt to find additional contiguous unique patterns
-##### Outputs a suggested patterns.tsv and an SV align
+##### Starting from a seed anchor pattern, attempt to find additional contiguous anchor patterns
+##### Outputs a suggested _anchors.tsv and an SV align with a six hexadecimal hash as ID for that seed.
 
 if len(sys.argv)!=6:
-	print("\tERROR: please input a .feat file, an estimated coverage, a seed pattern, a max window size, and whether to look for more patterns (default to minimal patterns, unless M as last positional argument).")
+	print("\tERROR: please input a .feat file, an estimated coverage, a seed pattern, a max window size,"
+			" and whether to look for more patterns (default to minimal patterns,"
+			" unless M as last positional argument).", file=sys.stderr)
 	sys.exit(2)
 
 feat_file = sys.argv[1]
@@ -18,15 +21,20 @@ start_pattern = sys.argv[3]
 max_SVkmer_len = int(sys.argv[4])
 max_search = sys.argv[5]
 
-patterns_out = f"""{feat_file.split(".")[0]}_draft_anchors.tsv""" # give these unique names based on seed?
-alignment_out = f"""{feat_file.split(".")[0]}_draft_SValign.tsv"""
+seed_tag = hashlib.sha1(start_pattern.encode()).hexdigest()[:6]
+out_prefix = f"{os.path.splitext(feat_file)[0]}_{seed_tag}"
+patterns_out = f"{out_prefix}_draft_anchors.tsv"
+alignment_out = f"{out_prefix}_draft_SValign.tsv"
+print(f"running for seed {start_pattern} -> {seed_tag} seed ID")
+
 
 ##### read in the feat file
 with open(feat_file, 'r') as feat_obj:
-	feat_fields = mod.read_in_feat(feat_obj)
-
+	feat_fields = [",".join(units) for units in mod.read_in_feat_aslol(feat_obj)]
+	
 # count number of features for first line
-num_features_present = len(feat_fields[1].split(",")[0].split("&"))
+num_features_present = len(feat_fields[0].split(",")[0].split("&"))
+
 
 ##### Make distribution of unit length counts and normalize
 distribution = {}
@@ -36,7 +44,6 @@ for features in feat_fields:
 
 	num_wins = 1
 	for x in range(count,0,-1): 
-
 		if x in distribution:
 			distribution[x] += num_wins
 		else:
@@ -47,8 +54,9 @@ norm_factor = distribution[1] / est_cov
 
 def make_varcall_consensus(search_pattern1, varcalls1, num_feat1):
 	### align current pattern
-	current_table = mod.align_varcall_table(search_pattern1, varcalls1, num_feat1, 0)
-	tp_current_table = list(map(list, zip(*current_table)))
+	current_table = [["-"] * start_col + calls
+		for start_col, calls in mod.align_varcall_table(search_pattern1, varcalls1, num_feat1, 0)]
+	tp_current_table = list(itertools.zip_longest(*current_table, fillvalue="-"))
 
 	### evaluate and make consensus
 	## for column in original table (using transposed table)
@@ -100,8 +108,8 @@ def make_varcall_consensus(search_pattern1, varcalls1, num_feat1):
 			## reject if any single column shows a divided pattern
 			if col_mismatches/col_total > .3:
 				good_columns = False
-				print("\nbad column")
-				print(col)
+				print("\nbad column", file=sys.stderr)
+				print(col, file=sys.stderr)
 
 	### convert consensus back to string for re searching
 	cons_string = ""
@@ -114,42 +122,23 @@ def make_varcall_consensus(search_pattern1, varcalls1, num_feat1):
 
 	return cons_string, good_columns
 
-def test_cov():
-	## make string
-	pre_re_string = r""
-	pre_re_string += ",".join(current_win)
+def test_cov(window, feat_fields, distribution, norm_factor, num_feat):
+	"""Return (pattern, new consensus string, expected cov, count) if window has expected coverage and a clean alignment, else None."""
+	pre_re_string = ",".join(window)
 
 	## using lookahead with internal capture to not consume overlapping matches
 	re_string = r"(?=(" + pre_re_string + r"))"
-	#print(re_string)
+	count = sum(len(re.findall(re_string, feat_field)) for feat_field in feat_fields)
 
-	## count occurences
-	count = 0
-	for feat_field in feat_fields:
-		count += len(re.findall(re_string, feat_field))
+	## if expected coverage found and alignment is good
+	exp_cov = distribution[len(window)] / norm_factor
+	if 0.7*exp_cov <= count <= 1.3*exp_cov:
+		new_cons_string, good = make_varcall_consensus(pre_re_string, feat_fields, num_feat)
+		if good:
+			return pre_re_string, new_cons_string, exp_cov, count
 
-	## if expected coverage found
-	current_exp_cov = distribution[len(current_win)] / norm_factor
-	if 0.7*current_exp_cov <= count <= 1.3*current_exp_cov:
-		## and aligment is good
-		new_cons_string, current_good = make_varcall_consensus(pre_re_string, feat_fields, num_features_present)
-		if current_good == True:
-
-			## determine outputs based on direction
-			if F == True:
-				relative_spacing = resplit_cons[1].count(",") + len(half_set) - w - 1 - size
-				patterns_line.append(pre_re_string)
-				spacing_line.append(str(relative_spacing))
-			else:
-				relative_spacing = len(half_set) - w - 1
-				patterns_line.insert(0, pre_re_string)
-				spacing_line[0] = str(relative_spacing)
-				spacing_line.insert(0, "50")
-
-			print(f"{pre_re_string}\t{relative_spacing}\t{current_exp_cov}\t{count}")
-			return new_cons_string, pre_re_string, True
-	#if True is not returned first
-	return current_cons_string, current_pattern, False
+	## Either threshold not met
+	return None
 
 ##### align patterns and find new ones until can't find unique pattern or consensus is ambiguous
 ### align and test start pattern
@@ -158,8 +147,8 @@ start_cons_string, good_start = make_varcall_consensus(start_pattern, feat_field
 #if good_start == False:
 #	### write the alignment for troubleshooting
 #	with open(alignment_out, 'w') as alignment_obj:
-#		for out_line in mod.align_varcall_table(start_pattern, feat_fields, num_features_present, 0):
-#			alignment_obj.write("\t".join(out_line) + "\n")
+#		for start_col, calls in mod.align_varcall_table(pattern, feat_fields, num_features_present, abs_spacing):
+#				alignment_obj.write("\t" * start_col + "\t".join(calls) + "\n")
 #
 #	### end script
 #	raise Exception("\nInitial pattern contains mismatching variant calls.\n")
@@ -194,66 +183,52 @@ for F in [True,False]:
 		else:
 			half_set = [s_unit.replace("--","[^,]+") for s_unit in resplit_cons[0].split(",")]
 
-		### if maximum pattern searching
-		if max_search == "M":
-			## loop sizes first
-			for size in range(1,max_SVkmer_len+1):
-				## loop through number of windows available for this size, starting with closest
-				for w in reversed(range(len(half_set[size:]))):
+		## loop sizes first
+		for size in range(1,max_SVkmer_len+1):
+			## loop through number of windows available for this size (closest first if max searching)
+			window_order = range(len(half_set[size:]))
+			if max_search == "M":
+				window_order = reversed(window_order)
+			for w in window_order:
 
-					## define window to examine based on direction
-					if F == True:
-						print(f"{-w-size-1}\t{-w-1}")
-						current_win = half_set[(-w-size-1):(-w-1)]
+				## define window to examine based on direction
+				if F == True:
+					print(f"{-w-size-1}\t{-w-1}", file=sys.stderr)
+					current_win = half_set[(-w-size-1):(-w-1)]
+				else:
+					print(f"{w}\t{w+size}", file=sys.stderr)
+					current_win = half_set[w:(w+size)]
+
+				result = test_cov(current_win, feat_fields, distribution, norm_factor, num_features_present)
+				if result:
+					current_pattern, current_cons_string, exp_cov, count = result
+					if F:
+						relative_spacing = resplit_cons[1].count(",") + len(half_set) - w - 1 - size
+						patterns_line.append(current_pattern)
+						spacing_line.append(str(relative_spacing))
 					else:
-						print(f"{w}\t{w+size}")
-						current_win = half_set[w:(w+size)]
+						relative_spacing = len(half_set) - w - 1
+						patterns_line.insert(0, current_pattern)
+						spacing_line[0] = str(relative_spacing)
+						spacing_line.insert(0, "50")
 
-					current_cons_string, current_pattern, cov_good = test_cov()
+					print(f"{current_pattern}\t{relative_spacing}\t{exp_cov}\t{count}")
 
-					if cov_good == True:
-						break
+					break
 
-				else: ## no break at this size
-					## Continue the outer loop
-					continue
-				## inner loop was broken, break the outer.
-				break
+			else: ## no break at this size
+				## Continue the outer loop
+				continue
+			## inner loop was broken, break the outer.
+			break
 
-			else: ## no break in finding new pattern, end search in this direction
-				contiguous = False #so that while loop stops
+		else: ## no break in finding new pattern, end search in this direction
+			contiguous = False #so that while loop stops
 
-		### default to greedy search if not doing max search
-		else:
-			## loop sizes first
-			for size in range(1,max_SVkmer_len+1):
-				## loop through number of windows available for this size
-				for w in range(len(half_set[size:])):
 
-					## define window to examine based on direction
-					if F == True:
-						print(f"{-w-size-1}\t{-w-1}")
-						current_win = half_set[(-w-size-1):(-w-1)]
-					else:
-						print(f"{w}\t{w+size}")
-						current_win = half_set[w:(w+size)]
 
-					current_cons_string, current_pattern, cov_good = test_cov()
-
-					if cov_good == True:
-						break
-
-				else: ## no break at this size
-					## Continue the outer loop
-					continue
-				## inner loop was broken, break the outer.
-				break
-
-			else: ## no break in finding new pattern, end search in this direction
-				contiguous = False #so that while loop stops
-
-print(spacing_line)
 ##### Output patterns file
+print(spacing_line)
 with open(patterns_out, 'w') as patterns_obj:
 	patterns_obj.write("\t".join(patterns_line) + "\n")
 	patterns_obj.write("\t".join(spacing_line) + "\n")
@@ -264,5 +239,5 @@ with open(alignment_out, 'w') as alignment_obj:
 	for pattern,rel_spacing in zip(patterns_line,spacing_line):
 		abs_spacing += int(rel_spacing)
 		alignment_obj.write("\t"*abs_spacing*num_features_present + pattern + "\n")
-		for out_line in mod.align_varcall_table(pattern, feat_fields, num_features_present, abs_spacing):
-			alignment_obj.write("\t".join(out_line) + "\n")
+		for start_col, calls in mod.align_varcall_table(pattern, feat_fields, num_features_present, abs_spacing):
+				alignment_obj.write("\t" * start_col + "\t".join(calls) + "\n")
